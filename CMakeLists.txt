@@ -35,7 +35,8 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(BlockRenderer BlockRenderer.c )
+#add_executable(BlockRenderer BlockRenderer.cpp dvhstx.cpp dvi.cpp intel_one_mono_2bpp.c)
+add_executable(BlockRenderer BlockRenderer.cpp dvi.cpp)
 
 pico_set_program_name(BlockRenderer "BlockRenderer")
 pico_set_program_version(BlockRenderer "0.1")
@@ -46,12 +47,14 @@ pico_enable_stdio_usb(BlockRenderer 0)
 
 # Add the standard library to the build
 target_link_libraries(BlockRenderer
-        pico_stdlib)
+        pico_stdlib hardware_dma)
 
 # Add the standard include files to the build
 target_include_directories(BlockRenderer PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}
 )
+
+#target_compile_options(BlockRenderer PRIVATE -O0)
 
 pico_add_extra_outputs(BlockRenderer)
 
