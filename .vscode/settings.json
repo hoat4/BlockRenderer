@@ -41,7 +41,11 @@
         "cstdint": "cpp",
         "algorithm": "cpp",
         "pll.h": "c",
-        "cmath": "c"
+        "cmath": "c",
+        "cstdlib": "cpp",
+        "vector": "cpp",
+        "cstring": "cpp",
+        "variant": "cpp"
     },
     "C_Cpp.vcFormat.newLine.beforeElse": false,
     "C_Cpp.vcFormat.newLine.beforeCatch": false,
