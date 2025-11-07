@@ -150,7 +150,6 @@ private:
 
     // DMA scanline filling
     unsigned int ch_num = 0;
-    int line_num = -1;
     int v_inactive_total;
     int v_total_active_lines;
     unsigned int frame_line_words;
@@ -176,5 +175,6 @@ public:
     }
 
 private:
+    void startDMA();
     void setupDisplayClock();
 };

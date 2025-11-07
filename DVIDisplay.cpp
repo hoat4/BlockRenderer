@@ -160,6 +160,23 @@ DVIDisplay::DVIDisplay(const Pinout pinout) : pinout(pinout) {
         memcpy(&line_buffers[i * frame_line_words], vactive_line_header, count_of(vactive_line_header) * sizeof(uint32_t));
     }
 
+    
+    for (int i = 0; i < NUM_CHANS; ++i) {
+        dma_channel_claim(i);
+    }
+    globalDVIDisplay = this;
+
+    printf("DMA channels claimed\n");
+
+    startDMA();
+
+    printf("Elindult\n");
+}
+
+void DVIDisplay::startDMA() {
+    irq_set_exclusive_handler(DMA_IRQ_2, dma_irq_handler);
+    irq_set_enabled(DMA_IRQ_2, true);
+
     printf("reset HSTX\n");
     reset_block_num(RESET_HSTX);
     sleep_us(10);
@@ -246,19 +263,11 @@ DVIDisplay::DVIDisplay(const Pinout pinout) : pinout(pinout) {
         );
     }
 
-    printf("DMA channels claimed\n");
-
     dma_hw->intr = (1 << NUM_CHANS) - 1;
     dma_hw->ints2 = (1 << NUM_CHANS) - 1;
     dma_hw->inte2 = (1 << NUM_CHANS) - 1;
 
-    globalDVIDisplay = this;
-    irq_set_exclusive_handler(DMA_IRQ_2, dma_irq_handler);
-    irq_set_enabled(DMA_IRQ_2, true);
-
     dma_channel_start(0);
-
-    printf("Elindult\n");
 }
 
 void DVIDisplay::setupDisplayClock() {
@@ -311,40 +320,10 @@ void DVIDisplay::handleInterrupt() {
         ch->transfer_count = frame_line_words;
 
         lineBuffers_minWriteable = (y + 1) % frame_height;
-
-        /*
-        // Fill line buffer
-        if (line_num != new_line_num)
-        {
-            line_num = new_line_num;
-            uint32_t* dst_ptr = &line_buffers[line_num * line_buf_total_len + count_of(vactive_line_header)];
-
-            //if (line_bytes_per_pixel == 2) {
-            // h_repeat_shift != 2
-            //uint16_t* src_ptr = (uint16_t*)&frame_buffer_display[y * 2 * (timing_mode->h_active_pixels >> h_repeat_shift)];
-
-            /*
-            for (int i = 0; i < timingMode.h_active_pixels >> 1; ++i) {
-                uint16_t srcColor = (i & 64) ? 0xFF00 : 0x99FF; // *src_ptr++
-                uint32_t val = (uint32_t)srcColor * 0x10001;
-                *dst_ptr++ = val;
-            }
-
-            memcpy(dst_ptr, lineBuffers2[LINE_BUFFER_COUNT], timingMode.h_active_pixels << 1);
-        }
-            */
     }
 
     if (++v_scanline == v_total_active_lines) {
         v_scanline = 0;
-        line_num = -1;
-        /*
-        if (flip_next) {
-            flip_next = false;
-            display->flip_now();
-        }
-        __sev();
-        */
     }
 
     irqCounter++;
@@ -353,7 +332,11 @@ void DVIDisplay::handleInterrupt() {
 LineBuffer DVIDisplay::nextLine() {
     int toBeWritten;
 
-    while (true) {
+    int waitCount = 0;
+    // legyen elég front/back porchhoz
+    const int STALL_LIMIT = 10000; // 1000
+
+    for (; waitCount<STALL_LIMIT; waitCount++) {
         toBeWritten = lineBuffers_write;
 
         int minWriteable = lineBuffers_minWriteable;
@@ -366,6 +349,39 @@ LineBuffer DVIDisplay::nextLine() {
                 break;
         }
         sleep_us(10);
+    }
+
+    if (waitCount == STALL_LIMIT) {
+        // debugban resume után van ez
+        printf("DVI output stalled (irq count: %d, ch0: %d, ch1: %d, ch2: %d, ch0: %d, ch1: %d, ch2: %d, FIFO stat: %u, INTR: %d)\n", 
+            irqCounter, 
+            dma_channel_is_busy(0), dma_channel_is_busy(1), dma_channel_is_busy(2), 
+            dma_channel_is_busy(0), dma_channel_is_busy(1), dma_channel_is_busy(2), 
+            hstx_fifo_hw->stat, 
+            dma_hw->intr
+        );
+        printf("DMA read addr: %p, write: %p, ctrl: %p\n", 
+            dma_hw->ch[0].read_addr, 
+            dma_hw->ch[0].write_addr,
+            dma_hw->ch[0].al1_ctrl
+        );
+        printf("DMA transfer count: %d, %d, %d\n", dma_hw->ch[0].transfer_count, dma_hw->ch[1].transfer_count, dma_hw->ch[2].transfer_count);
+        
+        dma_hw->ch[0].al1_ctrl = 1u<<30; // read error ack
+        dma_hw->ch[1].al1_ctrl = 1u<<30; // read error ack
+        dma_hw->ch[2].al1_ctrl = 1u<<30; // read error ack
+        toBeWritten = 0;
+        v_scanline = 2;
+        lineBuffers_write = 0;
+        lineBuffers_minWriteable = 0;
+        ch_num = 0;
+        startDMA();
+            
+        printf("DMA read addr: %p, write: %p, ctrl: %p\n", 
+            dma_hw->ch[0].read_addr, 
+            dma_hw->ch[0].write_addr,
+            dma_hw->ch[0].al1_ctrl
+        );
     }
 
     LineBuffer l;
