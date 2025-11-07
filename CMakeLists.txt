@@ -36,7 +36,7 @@ pico_sdk_init()
 # Add executable. Default name is the project name, version 0.1
 
 #add_executable(BlockRenderer BlockRenderer.cpp dvhstx.cpp dvi.cpp intel_one_mono_2bpp.c)
-add_executable(BlockRenderer BlockRenderer.cpp DVIDisplay.cpp)
+add_executable(BlockRenderer BlockRenderer.cpp DVIDisplay.cpp SpanRenderer.cpp Rasterizer.cpp)
 
 pico_set_program_name(BlockRenderer "BlockRenderer")
 pico_set_program_version(BlockRenderer "0.1")
