@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdint.h>
+
 /**
  * Negative or positive
  */
@@ -18,6 +20,30 @@ class FixedPointNumber {
         }
         static inline FixedPointNumber zero() {
             return FixedPointNumber(0);
+        }
+
+        static inline FixedPointNumber min(FixedPointNumber a, FixedPointNumber b) {
+            return a < b ? a : b;
+        }
+
+        static inline FixedPointNumber max() {
+            return FixedPointNumber(INT32_MAX);
+        }
+
+        static inline FixedPointNumber max(FixedPointNumber a, FixedPointNumber b) {
+            return a > b ? a : b;
+        }
+
+        inline bool operator == (FixedPointNumber other) {
+            return value == other.value;
+        }
+
+        inline bool operator != (FixedPointNumber other) {
+            return value != other.value;
+        }
+
+        inline bool operator <= (FixedPointNumber other) {
+            return value <= other.value;
         }
 
         inline bool operator >= (FixedPointNumber other) {
@@ -58,5 +84,9 @@ class FixedPointNumber {
 
         inline int fractionalPart() {
             return value & 0xFFFF;
+        }
+
+        inline int ceil() {
+            return value + 65535 >> 16;
         }
 };

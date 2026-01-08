@@ -30,13 +30,15 @@ include(pico_sdk_import.cmake)
 
 project(BlockRenderer C CXX ASM)
 
+set(PICO_CXX_ENABLE_EXCEPTIONS 1)
+
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
 #add_executable(BlockRenderer BlockRenderer.cpp dvhstx.cpp dvi.cpp intel_one_mono_2bpp.c)
-add_executable(BlockRenderer BlockRenderer.cpp DVIDisplay.cpp SpanRenderer.cpp Rasterizer.cpp)
+add_executable(BlockRenderer BlockRenderer.cpp DVIDisplay.cpp Rasterizer.cpp)
 
 pico_set_program_name(BlockRenderer "BlockRenderer")
 pico_set_program_version(BlockRenderer "0.1")

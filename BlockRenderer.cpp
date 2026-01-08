@@ -23,8 +23,6 @@ int main() {
 
     Game game(display.width(), display.height());
 
-    // érvénytelen értékre állítjuk induláskor, hogy az első frameet új framenek érzékelje
-    int expectedY = display.height();
     while (true) {
         LineBuffer lineBuffer = display.nextLine();
         game.renderLine(lineBuffer.lineNumber, lineBuffer.buffer);
@@ -35,7 +33,11 @@ int main() {
 }
 
 Game::Game(int width, int height) :
-    width(width), height(height), rasterizer(Rasterizer(width, height)) {
+    width(width), height(height), rasterizer(Rasterizer(width, height)),
+    rect1Pos({ .x = FixedPointNumber::ofInt(300), .y = FixedPointNumber::ofInt(200) }),
+    rect2Pos({ .x = FixedPointNumber::ofInt(50), .y = FixedPointNumber::ofInt(200) }),
+    rect1Dir({ .x = FixedPointNumber::ofInt(1), .y = FixedPointNumber::ofInt(1) }),
+    rect2Dir({ .x = FixedPointNumber::ofInt(1), .y = FixedPointNumber::ofInt(1) }) {
 
     // induláskor érvénytelen értékre állítjuk, hogy első frameet új framenek
     // érzékelje
@@ -57,45 +59,86 @@ void Game::renderLine(int y, uint16_t* buffer) {
 
     //if (y%10 == 0)
     //    printf("R%d\n", y);
-    rasterizer.renderLine(buffer);
+    try {
+        rasterizer.renderLine(buffer);
+    } catch(const char* msg) {
+        panic("failed to render line %d: %s\n", y, msg);
+    }
 }
 
 void Game::beginFrame() {
-    rasterizer.quads.clear();
+    for (auto it = rasterizer.shapes.begin(); it != rasterizer.shapes.end(); ++it)
+        delete* it;
+    rasterizer.shapes.clear();
 
-    Quad2D left(
-        { x: FixedPointNumber::ofInt(200), y : FixedPointNumber::zero() },
-        { x: FixedPointNumber::ofInt(200), y : FixedPointNumber::ofInt(height) },
-        { x: FixedPointNumber::zero(), y : FixedPointNumber::ofInt(height) },
-        { x: FixedPointNumber::zero(), y : FixedPointNumber::zero() },
-        0xFFF0
-    );
-    Quad2D center(
-        { x: FixedPointNumber::ofInt(300), y : FixedPointNumber::zero() },
-        { x: FixedPointNumber::ofInt(400), y : FixedPointNumber::ofInt(height) },
-        { x: FixedPointNumber::ofInt(200), y : FixedPointNumber::ofInt(height) },
-        { x: FixedPointNumber::ofInt(200), y : FixedPointNumber::zero() },
+    if (rect1Pos.x + rect1Dir.x < FixedPointNumber::zero() ||
+        rect1Pos.x + rect1Dir.x + FixedPointNumber::ofInt(200) > FixedPointNumber::ofInt(width)) {
+        rect1Dir.x = rect1Dir.x * -1;
+    }
+    if (rect1Pos.y + rect1Dir.y < FixedPointNumber::zero() ||
+        rect1Pos.y + rect1Dir.y + FixedPointNumber::ofInt(200) > FixedPointNumber::ofInt(height)) {
+        rect1Dir.y = rect1Dir.y * -1;
+    }
+    if (rect2Pos.x + rect2Dir.x < FixedPointNumber::zero() ||
+        rect2Pos.x + rect2Dir.x + FixedPointNumber::ofInt(200) > FixedPointNumber::ofInt(width)) {
+        rect2Dir.x = rect2Dir.x * -1;
+    }
+    if (rect2Pos.y + rect2Dir.y < FixedPointNumber::zero() ||
+        rect2Pos.y + rect2Dir.y + FixedPointNumber::ofInt(200) > FixedPointNumber::ofInt(height)) {
+        rect2Dir.y = rect2Dir.y * -1;
+    }
+    rect1Pos += rect1Dir;
+    rect2Pos += rect2Dir;
+
+    ConvexShape* background = ConvexShape::create(
+        {
+            { x: FixedPointNumber::zero(), y : FixedPointNumber::zero() },
+            { x: FixedPointNumber::zero(), y : FixedPointNumber::ofInt(height) }
+        },
+        {
+            { x: FixedPointNumber::ofInt(width), y : FixedPointNumber::zero() },
+            { x: FixedPointNumber::ofInt(width), y : FixedPointNumber::ofInt(height) },
+        },
+        0xFFFF
+        );
+    ConvexShape* center1 = ConvexShape::create(
+        {
+            { x: FixedPointNumber::ofInt(200), y : FixedPointNumber::ofInt(100) },
+            { x: FixedPointNumber::ofInt(200), y : FixedPointNumber::ofInt(300) },
+        },
+        {
+            { x: FixedPointNumber::ofInt(400), y : FixedPointNumber::ofInt(100) },
+            { x: FixedPointNumber::ofInt(400), y : FixedPointNumber::ofInt(300) },
+        },
         0x0FFF
-    );
-    Quad2D rightTop(
-        { x: FixedPointNumber::ofInt(width), y : FixedPointNumber::zero() },
-        { x: FixedPointNumber::ofInt(width), y : FixedPointNumber::ofInt(240) },
-        { x: FixedPointNumber::ofInt(400), y : FixedPointNumber::ofInt(240) },
-        { x: FixedPointNumber::ofInt(400), y : FixedPointNumber::zero() },
-        0xF0FF
-    );
-    Quad2D rightBottom(
-        { x: FixedPointNumber::ofInt(width), y : FixedPointNumber::ofInt(240) },
-        { x: FixedPointNumber::ofInt(width), y : FixedPointNumber::ofInt(height) },
-        { x: FixedPointNumber::ofInt(400), y : FixedPointNumber::ofInt(height) },
-        { x: FixedPointNumber::ofInt(400), y : FixedPointNumber::ofInt(240) },
-        0xF000
-    );
+        );
+    ConvexShape* center2 = ConvexShape::create(
+        {
+            { x: rect1Pos.x, y : rect1Pos.y },
+            { x: rect1Pos.x, y : rect1Pos.y + FixedPointNumber::ofInt(200) },
+        },
+        {
+            { x: rect1Pos.x + FixedPointNumber::ofInt(200), y : rect1Pos.y },
+            { x: rect1Pos.x + FixedPointNumber::ofInt(200), y : rect1Pos.y + FixedPointNumber::ofInt(200) },
+        },
+        0xFFF0
+        );
+    ConvexShape* center3 = ConvexShape::create(
+        {
+            { x: rect2Pos.x, y : rect2Pos.y },
+            { x: rect2Pos.x, y : rect2Pos.y + FixedPointNumber::ofInt(200) },
+        },
+        {
+            { x: rect2Pos.x + FixedPointNumber::ofInt(200), y : rect2Pos.y },
+            { x: rect2Pos.x + FixedPointNumber::ofInt(200), y : rect2Pos.y + FixedPointNumber::ofInt(200) },
+        },
+        0x0FF0
+        );
 
-    rasterizer.quads.push_back(left);
-    rasterizer.quads.push_back(center);
-    rasterizer.quads.push_back(rightTop);
-    rasterizer.quads.push_back(rightBottom);
+    rasterizer.shapes.push_back(background);
+    rasterizer.shapes.push_back(center1);
+    rasterizer.shapes.push_back(center2);
+    rasterizer.shapes.push_back(center3);
 
     rasterizer.beginFrame();
 }

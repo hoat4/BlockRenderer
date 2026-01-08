@@ -9,6 +9,11 @@ private:
     Rasterizer rasterizer;
     int expectedY;
 
+    Point2D rect1Pos;
+    Point2D rect2Pos;
+    Point2D rect1Dir;
+    Point2D rect2Dir;
+
 public:
     Game(int width, int height);
     void beginFrame();

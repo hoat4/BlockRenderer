@@ -2,42 +2,77 @@
 #include "FixedPointNumber.hpp"
 #include <vector>
 
+typedef uint16_t Color; // TODO
+
 struct Point2D {
     FixedPointNumber x;
     FixedPointNumber y;
+
+    void operator +=(Point2D other) {
+        x += other.x;
+        y += other.y;
+    }
 };
 
-struct Quad2D;
-
-struct VertexPointer {
-    int quadIndex;
-    int vertex;
+struct IntermediateVertex {
+    int y;
+    bool isLeft;
+    FixedPointNumber x;
+    FixedPointNumber slope;
 };
 
-struct Quad2D {
+class ConvexShape {
+
+    friend class Rasterizer;
+
+    int top;
+    /**
+     * az ennyiedik sorban már nem lesz active ez a shape
+     */
+    int bottom;
+
+    FixedPointNumber topLeftX;
+    FixedPointNumber topRightX;
+    FixedPointNumber topLeftSlope;
+    FixedPointNumber topRightSlope;
+    
+    Color color;
+
+    int intermediateVertexCount;
+
+    // Rasterizer::shapeListsByLine-ben használva
+    ConvexShape* nextInTopRow;
+
+    ConvexShape* prevInActiveList;
+    ConvexShape* nextInActiveList;
 
     /**
-     * Sorrend: felső, jobb, alsó, bal.
-     * Ha a teteje vízszintes, akkor a
-     * "felső" legyen a jobb felső, a "bal" pedig a bal felső.
+     * Rasterizer::processCurrentLine-ból használva
      */
-    Point2D points[4];
+    int nextIntermediateVertexIndex;
+
+    FixedPointNumber leftX;
+    FixedPointNumber leftSlope;
+    FixedPointNumber rightX;
+    FixedPointNumber rightSlope;
 
     /**
-     * ugyanolyan sorrendben, mint points
+     * Fentről lefele haladva.
      */
-    VertexPointer nexts[4];
+    IntermediateVertex intermediateVertices[];
 
-    uint16_t color;
+    public:
 
-    SpanEdge* rightEdge;
+    /**
+     * Mindkét listában legalább két pontnak kell lennie (felső, alsó).
+     * A pontok fentről lefele menjenek, és az első pont y-ja ugyanaz legyen mindkettő listában,
+     * valamint az utolsó pont y-ja is ugyanaz legyen mindkettő listában.
+     */
+    static ConvexShape* create(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints, Color color);
 
-    static const int VERTICES = 4;
-
-    Quad2D(Point2D a, Point2D b, Point2D c, Point2D d, uint16_t color) :
-        points({ a, b, c, d }), 
-        nexts({ {quadIndex: -1}, {quadIndex: -1}, {quadIndex: -1}, {quadIndex: -1} }), 
-        color(color) {}
+    private:
+    static FixedPointNumber slope(Point2D top, Point2D bottom);
+    static IntermediateVertex makeIntermediateVertex(Point2D top, Point2D bottom, bool isLeft);
 };
 
 class Rasterizer {
@@ -45,12 +80,13 @@ class Rasterizer {
 private:
     int width;
     int height;
-    SpanRenderer spanRenderer;
     int y = 0;
-    std::vector<VertexPointer> quadListsByLine;
+    std::vector<ConvexShape*> shapeListsByLine; 
+    ConvexShape* activeShapes; 
+    std::vector<ConvexShape*> shapeStack;
 
 public:
-    std::vector<Quad2D> quads;
+    std::vector<ConvexShape*> shapes;
 
     Rasterizer(int width, int height);
 
@@ -61,6 +97,10 @@ public:
     void renderLine(uint16_t* buffer);
 
 private:
-    void pushToQuadList(Quad2D& q, int quadIndex, int vertex);
+    void addToActiveList(ConvexShape* shape);
+    void removeFromActiveList(ConvexShape* shape);
+    bool processBreaksOnCurrentLine(ConvexShape* shape);
     void processCurrentLine();
+    void renderSpans(uint16_t* buffer);
+    void fillSpan(uint16_t* buffer, FixedPointNumber from, FixedPointNumber to);
 };
