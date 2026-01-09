@@ -1,7 +1,7 @@
 #include "FixedPointNumber.hpp"
 #include <vector>
 
-typedef uint16_t Color; // TODO
+typedef uint32_t Color; // TODO
 
 struct Point2D {
     FixedPointNumber x;
@@ -107,4 +107,5 @@ private:
     void printActiveShapes();
     void renderSpans(uint16_t* buffer);
     void fillSpan(uint16_t* buffer, FixedPointNumber from, FixedPointNumber to);
+    Color blendColorsDstOpaque(Color dst, Color src);
 };

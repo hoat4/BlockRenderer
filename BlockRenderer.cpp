@@ -115,7 +115,7 @@ void Game::beginFrame() {
             { x: FixedPointNumber::ofInt(width), y : FixedPointNumber::ofInt(height) },
         },
         FixedPointNumber::ofInt(0),
-        0xFFFF
+        0xFFFFFFFF
         );
     ConvexShape* center1 = ConvexShape::create(
         {
@@ -127,7 +127,7 @@ void Game::beginFrame() {
             { x: FixedPointNumber::ofInt(400), y : FixedPointNumber::ofInt(300) },
         },
         FixedPointNumber::ofInt(1),
-        0x0FFF
+        0xFF7F7FFF
         );
     ConvexShape* center2 = ConvexShape::create(
         {
@@ -139,7 +139,7 @@ void Game::beginFrame() {
             { x: rect1Pos.x + FixedPointNumber::ofInt(200), y : rect1Pos.y + FixedPointNumber::ofInt(200) },
         },
         FixedPointNumber::ofInt(2),
-        0xFFF0
+        0x88FF7F00
         );
     ConvexShape* center3 = ConvexShape::create(
         {
@@ -151,7 +151,7 @@ void Game::beginFrame() {
             { x: rect2Pos.x + FixedPointNumber::ofInt(200), y : rect2Pos.y + FixedPointNumber::ofInt(200) },
         },
         FixedPointNumber::ofInt(3),
-        0x0FF0
+        0x887FFF00
         );
 
     rasterizer.shapes.push_back(background);

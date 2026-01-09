@@ -240,13 +240,46 @@ void Rasterizer::fillSpan(uint16_t* buffer,
         throw "shape stack empty";
     }
 
-    // TODO blend
-    Color color = shapeStack.back()->color;
+    int firstOpaque = shapeStack.size() - 1;
+    while ((shapeStack[firstOpaque]->color & 0xFF000000) != 0xFF000000) {
+        if (firstOpaque == 0)
+            throw "no opaque shapes on stack";
+        firstOpaque--;
+    }
+
+    Color color = shapeStack[firstOpaque]->color;
+    for (int i = firstOpaque + 1; i < shapeStack.size(); i++)
+        color = blendColorsDstOpaque(color, shapeStack[i]->color);
+
+    unsigned int r = color >> 16 & 0xFF, g = color >> 8 & 0xFF, b = color & 0xFF;
+
+    uint16_t rgb565 = ((r & 0b11111000) << 8) | ((g & 0b11111100) << 3) | ((b & 0b11111000) >> 3);
+
     if (TRACE_FILLS)
-        printf("fill with %04x\n", color);
+        printf("fill with %04x\n", rgb565);
 
     for (; from < to; from++)
-        buffer[from] = color;
+        buffer[from] = rgb565;
+}
+
+Color Rasterizer::blendColorsDstOpaque(Color dst, Color src) {
+    unsigned int aa = src >> 24;
+    if (aa == 255) {
+        return src;
+    }
+
+    unsigned int ra = src >> 16 & 0xFF, rb = dst >> 16 & 0xFF;
+    unsigned int ga = src >> 8 & 0xFF, gb = dst >> 8 & 0xFF;
+    unsigned int ba = src & 0xFF, bb = dst & 0xFF;
+
+    unsigned int ro = ra * aa + rb * (255 - aa) + 127;
+    unsigned int go = ga * aa + gb * (255 - aa) + 127;
+    unsigned int bo = ba * aa + bb * (255 - aa) + 127;
+
+    //printf("(%d, %d, %d, %d) over (%d, %d, %d, %d): (%d, %d, %d, %d)\n", 
+    //    ra, ga, ba, aa, rb, gb, bb, ab, ro, go, bo, ao);
+
+    return 0xFF000000 | (ro & 0xFF00) << 8 | (go & 0xFF00) | bo >> 8;
 }
 
 FixedPointNumber ConvexShape::slope(Point2D top, Point2D bottom) {
