@@ -42,6 +42,12 @@ Game::Game(int width, int height) :
     // induláskor érvénytelen értékre állítjuk, hogy első frameet új framenek
     // érzékelje
     expectedY = height;
+
+    /*
+    for (int i = 0; i <400; i++) {
+        update();
+    }
+    */
 }
 
 void Game::renderLine(int y, uint16_t* buffer) {
@@ -66,11 +72,7 @@ void Game::renderLine(int y, uint16_t* buffer) {
     }
 }
 
-void Game::beginFrame() {
-    for (auto it = rasterizer.shapes.begin(); it != rasterizer.shapes.end(); ++it)
-        delete* it;
-    rasterizer.shapes.clear();
-
+void Game::update() {
     if (rect1Pos.x + rect1Dir.x < FixedPointNumber::zero() ||
         rect1Pos.x + rect1Dir.x + FixedPointNumber::ofInt(200) > FixedPointNumber::ofInt(width)) {
         rect1Dir.x = rect1Dir.x * -1;
@@ -87,8 +89,21 @@ void Game::beginFrame() {
         rect2Pos.y + rect2Dir.y + FixedPointNumber::ofInt(200) > FixedPointNumber::ofInt(height)) {
         rect2Dir.y = rect2Dir.y * -1;
     }
-    rect1Pos += rect1Dir;
-    rect2Pos += rect2Dir;
+    if (true) {
+        rect1Pos += rect1Dir;
+        rect2Pos += rect2Dir;
+    } else {
+        rect1Pos.x = FixedPointNumber::ofInt(0);
+        rect1Pos.y = FixedPointNumber::ofInt(100);
+    }
+}
+
+void Game::beginFrame() {
+    for (auto it = rasterizer.shapes.begin(); it != rasterizer.shapes.end(); ++it)
+        delete* it;
+    rasterizer.shapes.clear();
+
+    update();
 
     ConvexShape* background = ConvexShape::create(
         {
@@ -99,6 +114,7 @@ void Game::beginFrame() {
             { x: FixedPointNumber::ofInt(width), y : FixedPointNumber::zero() },
             { x: FixedPointNumber::ofInt(width), y : FixedPointNumber::ofInt(height) },
         },
+        FixedPointNumber::ofInt(0),
         0xFFFF
         );
     ConvexShape* center1 = ConvexShape::create(
@@ -110,17 +126,19 @@ void Game::beginFrame() {
             { x: FixedPointNumber::ofInt(400), y : FixedPointNumber::ofInt(100) },
             { x: FixedPointNumber::ofInt(400), y : FixedPointNumber::ofInt(300) },
         },
+        FixedPointNumber::ofInt(1),
         0x0FFF
         );
     ConvexShape* center2 = ConvexShape::create(
         {
-            { x: rect1Pos.x, y : rect1Pos.y },
+            { x: rect1Pos.x + FixedPointNumber::ofInt(100), y : rect1Pos.y },
             { x: rect1Pos.x, y : rect1Pos.y + FixedPointNumber::ofInt(200) },
         },
         {
-            { x: rect1Pos.x + FixedPointNumber::ofInt(200), y : rect1Pos.y },
+            { x: rect1Pos.x + FixedPointNumber::ofInt(100), y : rect1Pos.y },
             { x: rect1Pos.x + FixedPointNumber::ofInt(200), y : rect1Pos.y + FixedPointNumber::ofInt(200) },
         },
+        FixedPointNumber::ofInt(2),
         0xFFF0
         );
     ConvexShape* center3 = ConvexShape::create(
@@ -129,9 +147,10 @@ void Game::beginFrame() {
             { x: rect2Pos.x, y : rect2Pos.y + FixedPointNumber::ofInt(200) },
         },
         {
-            { x: rect2Pos.x + FixedPointNumber::ofInt(200), y : rect2Pos.y },
+            { x: rect2Pos.x, y : rect2Pos.y },
             { x: rect2Pos.x + FixedPointNumber::ofInt(200), y : rect2Pos.y + FixedPointNumber::ofInt(200) },
         },
+        FixedPointNumber::ofInt(3),
         0x0FF0
         );
 

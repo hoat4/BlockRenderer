@@ -1,4 +1,3 @@
-#include "SpanRenderer.hpp"
 #include "Rasterizer.hpp"
 
 class Game {
@@ -18,5 +17,8 @@ public:
     Game(int width, int height);
     void beginFrame();
     void renderLine(int y, uint16_t* buffer);
+
+private:
+    void update();
 
 };

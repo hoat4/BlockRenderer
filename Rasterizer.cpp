@@ -10,7 +10,7 @@ Rasterizer::Rasterizer(int width, int height) : width(width), height(height) {
 }
 
 void Rasterizer::beginFrame() {
-    std::fill(shapeListsByLine.begin(), shapeListsByLine.end(), (ConvexShape*) NULL);
+    std::fill(shapeListsByLine.begin(), shapeListsByLine.end(), (ConvexShape*)NULL);
 
     for (int shapeIndex = 0; shapeIndex < shapes.size(); shapeIndex++) {
         ConvexShape* s = shapes[shapeIndex];
@@ -34,7 +34,7 @@ void Rasterizer::skipLines(int lines) {
 }
 
 void Rasterizer::renderLine(uint16_t* buffer) {
-    //if (y == 0)
+    //if (y == 300)
     //    TRACE_FILLS = true;
 
     if (TRACE_FILLS || TRACE_CHANGE_ACTIVE_LIST)
@@ -42,15 +42,18 @@ void Rasterizer::renderLine(uint16_t* buffer) {
     processCurrentLine();
     renderSpans(buffer);
 
-    //if (y == 0)
+    //if (y == 300)
     //    TRACE_FILLS = false;
 
     y++;
 }
 
 void Rasterizer::addToActiveList(ConvexShape* shapeToAdd) {
-    if (TRACE_CHANGE_ACTIVE_LIST || TRACE_FILLS)
-        printf("Add %04x\n", shapeToAdd->color);
+    if (TRACE_CHANGE_ACTIVE_LIST || TRACE_FILLS) {
+        printf("Before addToActiveList: ");
+        printActiveShapes();
+        printf("Add %04x at %d-%d\n", shapeToAdd->color, shapeToAdd->leftX, shapeToAdd->rightX);
+    }
     ConvexShape* shape = activeShapes;
     ConvexShape* addAfter = NULL;
     for (ConvexShape* shape = activeShapes; shape && shape->leftX <= shapeToAdd->leftX; shape = shape->nextInActiveList) {
@@ -84,6 +87,22 @@ void Rasterizer::removeFromActiveList(ConvexShape* shape) {
     shape->nextInActiveList = NULL;
 }
 
+void Rasterizer::shiftLeftInActiveList(ConvexShape* shape) {
+    while (shape->prevInActiveList && shape->leftX < shape->prevInActiveList->leftX) {
+        ConvexShape* prev = shape->prevInActiveList;
+        if (shape->nextInActiveList)
+            shape->nextInActiveList->prevInActiveList = prev;
+        if (prev->prevInActiveList)
+            prev->prevInActiveList->nextInActiveList = shape;
+        else
+            activeShapes = shape;
+        shape->prevInActiveList = prev->prevInActiveList;
+        prev->nextInActiveList = shape->nextInActiveList;
+        shape->nextInActiveList = prev;
+        prev->prevInActiveList = shape;
+    }
+}
+
 void Rasterizer::processCurrentLine() {
     for (ConvexShape* shape = activeShapes; shape; ) {
         ConvexShape* next = shape->nextInActiveList; // removeFromActiveList megváltoztatja shape->nextInActiveList-et
@@ -93,8 +112,8 @@ void Rasterizer::processCurrentLine() {
             if (!processBreaksOnCurrentLine(shape)) {
                 shape->leftX += shape->leftSlope;
                 shape->rightX += shape->rightSlope;
-                // TODO más shapeek szélével metszés detektálása
             }
+            shiftLeftInActiveList(shape);
         }
         shape = next;
     }
@@ -103,14 +122,28 @@ void Rasterizer::processCurrentLine() {
          shape != NULL;
          shape = shape->nextInTopRow) {
 
-        addToActiveList(shape);
-
         shape->leftX = shape->topLeftX;
         shape->leftSlope = shape->topLeftSlope;
         shape->rightX = shape->topRightX;
         shape->rightSlope = shape->topRightSlope;
 
+        addToActiveList(shape);
+
         processBreaksOnCurrentLine(shape);
+
+        shiftLeftInActiveList(shape);
+    }
+
+    checkActiveShapes();
+}
+
+void Rasterizer::checkActiveShapes() {
+    ConvexShape* prevS = NULL;
+    for (ConvexShape* shape = activeShapes; shape; shape = shape->nextInActiveList) {
+        if (prevS && (shape->leftX < prevS->leftX || shape->prevInActiveList != prevS)) {
+            throw "wrong active shapes";
+        }
+        prevS = shape;
     }
 }
 
@@ -134,16 +167,20 @@ bool Rasterizer::processBreaksOnCurrentLine(ConvexShape* shape) {
     return hadBreaks;
 }
 
+void Rasterizer::printActiveShapes() {
+    printf("Active shapes: ");
+    for (ConvexShape* shape = activeShapes; shape; shape = shape->nextInActiveList) {
+        printf("%04x at %d-%d, ", shape->color, shape->leftX.floor(), shape->rightX.floor());
+    }
+    printf("\n");
+}
+
 void Rasterizer::renderSpans(uint16_t* buffer) {
     if (!shapeStack.empty())
         throw "activeShapes size not zero (at begin)";
 
     if (TRACE_FILLS) {
-        printf("Active shapes: ");
-        for (ConvexShape* shape = activeShapes; shape; shape = shape->nextInActiveList) {
-            printf("%04x at %d-%d, ", shape->color, shape->leftX.floor(), shape->rightX.floor());
-        }
-        printf("\n");
+        printActiveShapes();
     }
 
     FixedPointNumber prevX = FixedPointNumber::zero();
@@ -168,7 +205,18 @@ void Rasterizer::renderSpans(uint16_t* buffer) {
                 printf("LEFT at %d-%d\n", prevX.floor(), nextLeft->leftX.floor());
             fillSpan(buffer, prevX, nextLeft->leftX);
             prevX = nextLeft->leftX;
-            shapeStack.push_back(nextLeft);
+
+            bool inserted = false;
+            for (auto it = shapeStack.begin(); it != shapeStack.end(); ++it) {
+                if ((*it)->z > nextLeft->z) {
+                    shapeStack.insert(it, nextLeft);
+                    inserted = true;
+                    break;
+                }
+            }
+            if (!inserted)
+                shapeStack.push_back(nextLeft);
+
             nextLeft = nextLeft->nextInActiveList;
         } else {
             break;
@@ -215,7 +263,9 @@ IntermediateVertex ConvexShape::makeIntermediateVertex(Point2D top, Point2D bott
 }
 
 ConvexShape* ConvexShape::create(
-    std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints, Color color) {
+    std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints,
+    FixedPointNumber z,
+    Color color) {
 
     if (leftPoints.size() < 2 || rightPoints.size() < 2)
         throw "too few points";
@@ -240,6 +290,7 @@ ConvexShape* ConvexShape::create(
 
     shape->color = color;
     shape->intermediateVertexCount = intermediatePointCount;
+    shape->z = z;
 
     for (int i = 1, j = 1, v = 0; ; ) {
         if (i < leftPoints.size() - 1) {
