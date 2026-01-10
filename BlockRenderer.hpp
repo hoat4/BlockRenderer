@@ -1,5 +1,7 @@
 #include "Rasterizer.hpp"
 
+class Triangle;
+
 class Game {
 
 private:
@@ -8,10 +10,7 @@ private:
     Rasterizer rasterizer;
     int expectedY;
 
-    Point2D rect1Pos;
-    Point2D rect2Pos;
-    Point2D rect1Dir;
-    Point2D rect2Dir;
+    std::vector<Triangle> triangles;
 
 public:
     Game(int width, int height);
@@ -21,4 +20,15 @@ public:
 private:
     void update();
 
+};
+
+class Triangle {
+    public: 
+        Point2D pos;
+        Point2D dir;
+        Color color;
+
+        Triangle();
+
+        ConvexShape* toShape(FixedPointNumber z);
 };

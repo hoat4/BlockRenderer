@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "DVIDisplay.hpp"
 #include "pico/stdlib.h"
+#include "pico/rand.h"
 
 #include "BlockRenderer.hpp"
 
@@ -33,21 +34,15 @@ int main() {
 }
 
 Game::Game(int width, int height) :
-    width(width), height(height), rasterizer(Rasterizer(width, height)),
-    rect1Pos({ .x = FixedPointNumber::ofInt(300), .y = FixedPointNumber::ofInt(200) }),
-    rect2Pos({ .x = FixedPointNumber::ofInt(50), .y = FixedPointNumber::ofInt(200) }),
-    rect1Dir({ .x = FixedPointNumber::ofInt(1), .y = FixedPointNumber::ofInt(1) }),
-    rect2Dir({ .x = FixedPointNumber::ofInt(1), .y = FixedPointNumber::ofInt(1) }) {
+    width(width), height(height), rasterizer(Rasterizer(width, height)) {
 
     // induláskor érvénytelen értékre állítjuk, hogy első frameet új framenek
     // érzékelje
     expectedY = height;
 
-    /*
-    for (int i = 0; i <400; i++) {
-        update();
+    for (int i = 0; i < 15; i++) {
+        triangles.push_back(Triangle());
     }
-    */
 }
 
 void Game::renderLine(int y, uint16_t* buffer) {
@@ -67,34 +62,25 @@ void Game::renderLine(int y, uint16_t* buffer) {
     //    printf("R%d\n", y);
     try {
         rasterizer.renderLine(buffer);
-    } catch(const char* msg) {
+    } catch (const char* msg) {
         panic("failed to render line %d: %s\n", y, msg);
     }
 }
 
 void Game::update() {
-    if (rect1Pos.x + rect1Dir.x < FixedPointNumber::zero() ||
-        rect1Pos.x + rect1Dir.x + FixedPointNumber::ofInt(200) > FixedPointNumber::ofInt(width)) {
-        rect1Dir.x = rect1Dir.x * -1;
-    }
-    if (rect1Pos.y + rect1Dir.y < FixedPointNumber::zero() ||
-        rect1Pos.y + rect1Dir.y + FixedPointNumber::ofInt(200) > FixedPointNumber::ofInt(height)) {
-        rect1Dir.y = rect1Dir.y * -1;
-    }
-    if (rect2Pos.x + rect2Dir.x < FixedPointNumber::zero() ||
-        rect2Pos.x + rect2Dir.x + FixedPointNumber::ofInt(200) > FixedPointNumber::ofInt(width)) {
-        rect2Dir.x = rect2Dir.x * -1;
-    }
-    if (rect2Pos.y + rect2Dir.y < FixedPointNumber::zero() ||
-        rect2Pos.y + rect2Dir.y + FixedPointNumber::ofInt(200) > FixedPointNumber::ofInt(height)) {
-        rect2Dir.y = rect2Dir.y * -1;
-    }
-    if (true) {
-        rect1Pos += rect1Dir;
-        rect2Pos += rect2Dir;
-    } else {
-        rect1Pos.x = FixedPointNumber::ofInt(0);
-        rect1Pos.y = FixedPointNumber::ofInt(100);
+    for (auto it = triangles.begin(); it != triangles.end(); ++it) {
+        Triangle& t = *it;
+
+        if (t.pos.x + t.dir.x < FixedPointNumber::zero() ||
+            t.pos.x + t.dir.x + FixedPointNumber::ofInt(100) > FixedPointNumber::ofInt(width)) {
+            t.dir.x = t.dir.x * -1;
+        }
+        if (t.pos.y + t.dir.y < FixedPointNumber::zero() ||
+            t.pos.y + t.dir.y + FixedPointNumber::ofInt(100) > FixedPointNumber::ofInt(height)) {
+            t.dir.y = t.dir.y * -1;
+        }
+
+        t.pos += t.dir;
     }
 }
 
@@ -117,47 +103,50 @@ void Game::beginFrame() {
         FixedPointNumber::ofInt(0),
         0xFFFFFFFF
         );
-    ConvexShape* center1 = ConvexShape::create(
-        {
-            { x: FixedPointNumber::ofInt(200), y : FixedPointNumber::ofInt(100) },
-            { x: FixedPointNumber::ofInt(200), y : FixedPointNumber::ofInt(300) },
-        },
-        {
-            { x: FixedPointNumber::ofInt(400), y : FixedPointNumber::ofInt(100) },
-            { x: FixedPointNumber::ofInt(400), y : FixedPointNumber::ofInt(300) },
-        },
-        FixedPointNumber::ofInt(1),
-        0xFF7F7FFF
-        );
-    ConvexShape* center2 = ConvexShape::create(
-        {
-            { x: rect1Pos.x + FixedPointNumber::ofInt(100), y : rect1Pos.y },
-            { x: rect1Pos.x, y : rect1Pos.y + FixedPointNumber::ofInt(200) },
-        },
-        {
-            { x: rect1Pos.x + FixedPointNumber::ofInt(100), y : rect1Pos.y },
-            { x: rect1Pos.x + FixedPointNumber::ofInt(200), y : rect1Pos.y + FixedPointNumber::ofInt(200) },
-        },
-        FixedPointNumber::ofInt(2),
-        0x88FF7F00
-        );
-    ConvexShape* center3 = ConvexShape::create(
-        {
-            { x: rect2Pos.x, y : rect2Pos.y },
-            { x: rect2Pos.x, y : rect2Pos.y + FixedPointNumber::ofInt(200) },
-        },
-        {
-            { x: rect2Pos.x, y : rect2Pos.y },
-            { x: rect2Pos.x + FixedPointNumber::ofInt(200), y : rect2Pos.y + FixedPointNumber::ofInt(200) },
-        },
-        FixedPointNumber::ofInt(3),
-        0x887FFF00
-        );
-
     rasterizer.shapes.push_back(background);
-    rasterizer.shapes.push_back(center1);
-    rasterizer.shapes.push_back(center2);
-    rasterizer.shapes.push_back(center3);
+
+    for (int i = 0; i < triangles.size(); i++) {
+        rasterizer.shapes.push_back(triangles[i].toShape(FixedPointNumber::ofInt(i + 1)));
+    }
 
     rasterizer.beginFrame();
+}
+
+Triangle::Triangle() :
+    pos({
+        .x = FixedPointNumber::ofInt(get_rand_32() % (640 - 100)),
+         .y = FixedPointNumber::ofInt(get_rand_32() % (480 - 100))
+        }),
+    dir({
+        .x = FixedPointNumber::ofInt(get_rand_32() % 400 - 200) / 100,
+        .y = FixedPointNumber::ofInt(get_rand_32() % 400 - 200) / 100
+        }),
+    color(get_rand_32() & 0x00FFFFFF | 0xAA000000) {
+}
+
+ConvexShape* Triangle::toShape(FixedPointNumber z) {
+    return ConvexShape::create(
+        {
+            {
+                .x = pos.x + FixedPointNumber::ofInt(50),
+                .y = pos.y
+            },
+            {
+                .x = pos.x,
+                .y = pos.y + FixedPointNumber::ofInt(100)
+            }
+        },
+        {
+            {
+                .x = pos.x + FixedPointNumber::ofInt(50),
+                .y = pos.y
+            },
+            {
+                .x = pos.x + FixedPointNumber::ofInt(100),
+                .y = pos.y + FixedPointNumber::ofInt(100)
+            }
+        },
+        z,
+        color
+    );
 }
