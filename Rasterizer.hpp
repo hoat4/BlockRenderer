@@ -1,3 +1,5 @@
+#pragma once
+
 #include "FixedPointNumber.hpp"
 #include <vector>
 
@@ -96,6 +98,9 @@ public:
     void skipLines(int lines);
 
     void renderLine(uint16_t* buffer);
+
+    int screenWidth();
+    int screenHeight();
 
 private:
     void addToActiveList(ConvexShape* shape);

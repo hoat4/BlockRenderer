@@ -9,6 +9,14 @@ Rasterizer::Rasterizer(int width, int height) : width(width), height(height) {
     shapeListsByLine.resize(height);
 }
 
+int Rasterizer::screenWidth() {
+    return width;
+}
+
+int Rasterizer::screenHeight() {
+    return height;
+}
+
 void Rasterizer::beginFrame() {
     std::fill(shapeListsByLine.begin(), shapeListsByLine.end(), (ConvexShape*)NULL);
 

@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include "DVIDisplay.hpp"
 #include "pico/stdlib.h"
-#include "pico/rand.h"
 
 #include "BlockRenderer.hpp"
+#include "TriangleDemo.hpp"
 
 void vacak() {
     gpio_init(PICO_DEFAULT_LED_PIN);
@@ -40,17 +40,16 @@ Game::Game(int width, int height) :
     // érzékelje
     expectedY = height;
 
-    for (int i = 0; i < 15; i++) {
-        triangles.push_back(Triangle());
-    }
+    scene = new TriangleDemo();
+    scene->rasterizer = &rasterizer;
 }
 
 void Game::renderLine(int y, uint16_t* buffer) {
     if (y < expectedY) {
         // new frame
 
-        beginFrame();
-
+        scene->update();
+        rasterizer.beginFrame();
         if (y != 0)
             rasterizer.skipLines(y);
     } else if (y > expectedY) {
@@ -65,88 +64,4 @@ void Game::renderLine(int y, uint16_t* buffer) {
     } catch (const char* msg) {
         panic("failed to render line %d: %s\n", y, msg);
     }
-}
-
-void Game::update() {
-    for (auto it = triangles.begin(); it != triangles.end(); ++it) {
-        Triangle& t = *it;
-
-        if (t.pos.x + t.dir.x < FixedPointNumber::zero() ||
-            t.pos.x + t.dir.x + FixedPointNumber::ofInt(100) > FixedPointNumber::ofInt(width)) {
-            t.dir.x = t.dir.x * -1;
-        }
-        if (t.pos.y + t.dir.y < FixedPointNumber::zero() ||
-            t.pos.y + t.dir.y + FixedPointNumber::ofInt(100) > FixedPointNumber::ofInt(height)) {
-            t.dir.y = t.dir.y * -1;
-        }
-
-        t.pos += t.dir;
-    }
-}
-
-void Game::beginFrame() {
-    for (auto it = rasterizer.shapes.begin(); it != rasterizer.shapes.end(); ++it)
-        delete* it;
-    rasterizer.shapes.clear();
-
-    update();
-
-    ConvexShape* background = ConvexShape::create(
-        {
-            { x: FixedPointNumber::zero(), y : FixedPointNumber::zero() },
-            { x: FixedPointNumber::zero(), y : FixedPointNumber::ofInt(height) }
-        },
-        {
-            { x: FixedPointNumber::ofInt(width), y : FixedPointNumber::zero() },
-            { x: FixedPointNumber::ofInt(width), y : FixedPointNumber::ofInt(height) },
-        },
-        FixedPointNumber::ofInt(0),
-        0xFFFFFFFF
-        );
-    rasterizer.shapes.push_back(background);
-
-    for (int i = 0; i < triangles.size(); i++) {
-        rasterizer.shapes.push_back(triangles[i].toShape(FixedPointNumber::ofInt(i + 1)));
-    }
-
-    rasterizer.beginFrame();
-}
-
-Triangle::Triangle() :
-    pos({
-        .x = FixedPointNumber::ofInt(get_rand_32() % (640 - 100)),
-         .y = FixedPointNumber::ofInt(get_rand_32() % (480 - 100))
-        }),
-    dir({
-        .x = FixedPointNumber::ofInt(get_rand_32() % 400 - 200) / 100,
-        .y = FixedPointNumber::ofInt(get_rand_32() % 400 - 200) / 100
-        }),
-    color(get_rand_32() & 0x00FFFFFF | 0xAA000000) {
-}
-
-ConvexShape* Triangle::toShape(FixedPointNumber z) {
-    return ConvexShape::create(
-        {
-            {
-                .x = pos.x + FixedPointNumber::ofInt(50),
-                .y = pos.y
-            },
-            {
-                .x = pos.x,
-                .y = pos.y + FixedPointNumber::ofInt(100)
-            }
-        },
-        {
-            {
-                .x = pos.x + FixedPointNumber::ofInt(50),
-                .y = pos.y
-            },
-            {
-                .x = pos.x + FixedPointNumber::ofInt(100),
-                .y = pos.y + FixedPointNumber::ofInt(100)
-            }
-        },
-        z,
-        color
-    );
 }
