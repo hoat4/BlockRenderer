@@ -313,14 +313,13 @@ ConvexShape* ConvexShape::create(
     FixedPointNumber z,
     Color color) {
 
-    ConvexShape* shape = create(leftPoints.size(), rightPoints.size(), z, color);
-    shape->modifyPoints(leftPoints, rightPoints);
+    ConvexShape* shape = create(leftPoints.size(), rightPoints.size(), color);
+    shape->modifyPoints(leftPoints, rightPoints, z);
     return shape;
 }
 
 ConvexShape* ConvexShape::create(
     int maxLeftVertexCount, int maxRightVertexCount,
-    FixedPointNumber z,
     Color color) {
 
     if (maxLeftVertexCount < 2 || maxRightVertexCount < 2)
@@ -332,12 +331,12 @@ ConvexShape* ConvexShape::create(
 
     shape->color = color;
     shape->maxIntermediateVertexCount = maxIntermediatePointCount;
-    shape->z = z;
 
     return shape;
 }
 
-void ConvexShape::modifyPoints(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints) {
+void ConvexShape::modifyPoints(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints, 
+                                FixedPointNumber z) {
     if (leftPoints.size() < 2 || rightPoints.size() < 2)
         throw "too few points";
     if (leftPoints[0].y != rightPoints[0].y)
@@ -352,6 +351,7 @@ void ConvexShape::modifyPoints(std::vector<Point2D> leftPoints, std::vector<Poin
 
     this->top = leftPoints.front().y.floor();
     this->bottom = leftPoints.back().y.ceil();
+    this->z = z;
 
     if (top == bottom)
         // felesleges kiszámolni a pontokat, mert beginFrame úgyis ignorálni fogja ezt a shapeet

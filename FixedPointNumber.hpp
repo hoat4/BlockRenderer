@@ -18,12 +18,21 @@ class FixedPointNumber {
         static inline FixedPointNumber ofIntAndFractional(int integral, int fraction) {
             return FixedPointNumber(integral << 16 | fraction);
         }
+
         static inline FixedPointNumber zero() {
             return FixedPointNumber(0);
         }
 
+        static inline FixedPointNumber half() {
+            return FixedPointNumber(32768);
+        }
+
         static inline FixedPointNumber min(FixedPointNumber a, FixedPointNumber b) {
             return a < b ? a : b;
+        }
+
+        static inline FixedPointNumber min() {
+            return FixedPointNumber(INT32_MIN);
         }
 
         static inline FixedPointNumber max() {
@@ -96,5 +105,16 @@ class FixedPointNumber {
 
         inline int ceil() {
             return value + 65535 >> 16;
+        }
+
+        inline FixedPointNumber operator -() {
+            return FixedPointNumber(-value);
+        }
+
+        inline static FixedPointNumber hypotSq(FixedPointNumber a, 
+                                               FixedPointNumber b, 
+                                               FixedPointNumber c) {
+            int64_t al = a.value, bl = b.value, cl = c.value;
+            return (al*al + bl*bl + cl*cl) >> 32;
         }
 };

@@ -7,7 +7,8 @@ Cubes::Cubes() : cameraPos(Point3D(FixedPointNumber::zero(), FixedPointNumber::z
     addCube(Point3DInt(1, 0, 5));
     addCube(Point3DInt(1, -2, 5));
     addCube(Point3DInt(-3, -2, 10));
-    addCube(Point3DInt(-4, 2, 10));
+    addCube(Point3DInt(-3, 2, 10));
+    addCube(Point3DInt(1, -1, 4));
 
     frameID = 0;
 }
@@ -31,7 +32,7 @@ void Cubes::update() {
                 { x: FixedPointNumber::ofInt(rasterizer->screenWidth()), y : FixedPointNumber::zero() },
                 { x: FixedPointNumber::ofInt(rasterizer->screenWidth()), y : FixedPointNumber::ofInt(rasterizer->screenHeight()) },
             },
-            FixedPointNumber::ofInt(0),
+            FixedPointNumber::min(),
             0xFF55EEFF
             );
         rasterizer->shapes.push_back(background);
@@ -81,8 +82,7 @@ void Cubes::update() {
                 continue;
             }
             if (cube.cachedShapes[face] == NULL)
-                cube.cachedShapes[face] = ConvexShape::create(4, 4,
-                                                              FixedPointNumber::ofInt(1), faceColor);
+                cube.cachedShapes[face] = ConvexShape::create(4, 4, faceColor);
             rasterizer->shapes.push_back(cube.cachedShapes[face]);
             projectCubeFace(cube, (CubeFace)face);
         }
@@ -152,7 +152,14 @@ printf("projected points: %d,%d; %d,%d; %d,%d; %d,%d\n",
     leftPoints.push_back(points[3]);
     rightPoints.push_back(points[3]);
 
-    cube.cachedShapes[face]->modifyPoints(leftPoints, rightPoints);
+    Point3D cubeCenter(
+        FixedPointNumber::ofInt(cube.pos.x) + FixedPointNumber::half(),
+        FixedPointNumber::ofInt(cube.pos.y) + FixedPointNumber::half(),
+        FixedPointNumber::ofInt(cube.pos.z) + FixedPointNumber::half()
+    );
+    FixedPointNumber zIndex = Point3D::distanceSq(cubeCenter, cameraPos);
+
+    cube.cachedShapes[face]->modifyPoints(leftPoints, rightPoints, -zIndex);
 }
 
 Point2D Cubes::projectPoint(Point3DInt p) {

@@ -11,6 +11,13 @@ struct Point3D {
     FixedPointNumber z;
 
     Point3D(FixedPointNumber x, FixedPointNumber y, FixedPointNumber z) : x(x), y(y), z(z) {}
+
+    inline static FixedPointNumber distanceSq(Point3D a, Point3D b) {
+        FixedPointNumber dx = a.x-b.x;
+        FixedPointNumber dy = a.y-b.y;
+        FixedPointNumber dz = a.z-b.z;
+        return FixedPointNumber::hypotSq(dx, dy, dz);
+    }
 };
 
 struct Point3DInt {

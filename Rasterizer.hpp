@@ -36,7 +36,7 @@ class ConvexShape {
     FixedPointNumber topRightX;
     FixedPointNumber topLeftSlope;
     FixedPointNumber topRightSlope;
-    
+
     FixedPointNumber z;
 
     Color color;
@@ -65,7 +65,7 @@ class ConvexShape {
      */
     IntermediateVertex intermediateVertices[];
 
-    public:
+public:
 
     /**
      * Mindkét listában legalább két pontnak kell lennie (felső, alsó).
@@ -77,11 +77,12 @@ class ConvexShape {
     /**
      * Ezután a modifyPointsot meg kell hívni.
      */
-    static ConvexShape* create(int maxLeftPoints, int maxRightPoints, FixedPointNumber z, Color color);
+    static ConvexShape* create(int maxLeftPoints, int maxRightPoints, Color color);
 
-    void modifyPoints(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints);
+    void modifyPoints(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints,
+                      FixedPointNumber z);
 
-    private:
+private:
     static FixedPointNumber slope(Point2D top, Point2D bottom);
     static IntermediateVertex makeIntermediateVertex(Point2D top, Point2D bottom, bool isLeft);
 };
@@ -92,8 +93,8 @@ private:
     int width;
     int height;
     int y = 0;
-    std::vector<ConvexShape*> shapeListsByLine; 
-    ConvexShape* activeShapes; 
+    std::vector<ConvexShape*> shapeListsByLine;
+    ConvexShape* activeShapes;
     std::vector<ConvexShape*> shapeStack;
 
 public:
