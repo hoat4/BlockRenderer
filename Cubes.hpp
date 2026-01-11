@@ -1,6 +1,6 @@
 #include "Scene.hpp"
 
-class CubeFace;
+struct Cube;
 struct Point3D;
 struct Point3DInt;
 
@@ -25,8 +25,18 @@ struct Point3DInt {
     }
 };
 
+// sorrend CUBE_VERTEX_OFFSETS-ben is van használva
+enum CubeFace {
+    FACE_TOP, 
+    FACE_BOTTOM, 
+    FACE_NORTH,
+    FACE_WEST,  
+    FACE_SOUTH, 
+    FACE_EAST
+};
+
 class Cubes : public Scene {
-    std::vector<CubeFace> faces;
+    std::vector<Cube> cubes;
     uint64_t frameID;
     Point3D cameraPos;
 
@@ -35,25 +45,15 @@ class Cubes : public Scene {
     void update();
 
     private:
-    void projectCubeFace(CubeFace& face);
+    void addCube(Point3DInt pos);
+    void projectCubeFace(Cube& cube, CubeFace face);
     Point2D projectPoint(Point3DInt p);
 };
 
-enum FaceSide {
-    FACE_SIDE_TOP, 
-    FACE_SIDE_BOTTOM, 
-    FACE_SIDE_NORTH,
-    FACE_SIDE_WEST, 
-    FACE_SIDE_SOUTH, 
-    FACE_SIDE_EAST
-};
+struct Cube {
 
-struct CubeFace {
-
-    Point3DInt cubePos;
-    FaceSide side;
-    Color color;
+    Point3DInt pos;
 
     uint64_t updatedAtFrame;
-    ConvexShape* cachedShape;
+    ConvexShape* cachedShapes[6];
 };

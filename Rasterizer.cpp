@@ -22,6 +22,10 @@ void Rasterizer::beginFrame() {
 
     for (int shapeIndex = 0; shapeIndex < shapes.size(); shapeIndex++) {
         ConvexShape* s = shapes[shapeIndex];
+        if (s->top == s->bottom)
+            // processCurrentLine előbb nézi a kiszedhetőeket mint a berakhatóakat,
+            // ezért bennmaradnának a képernyő aljáig a 0 magasságú shapeek
+            continue;
         s->nextIntermediateVertexIndex = 0;
         s->nextInTopRow = shapeListsByLine[s->top];
         s->prevInActiveList = NULL;
@@ -345,10 +349,15 @@ void ConvexShape::modifyPoints(std::vector<Point2D> leftPoints, std::vector<Poin
     if (this->maxIntermediateVertexCount < intermediatePointCount)
         throw "intermediate vertex count too large";
 
-    this->intermediateVertexCount = intermediatePointCount;
 
     this->top = leftPoints.front().y.floor();
     this->bottom = leftPoints.back().y.ceil();
+
+    if (top == bottom)
+        // felesleges kiszámolni a pontokat, mert beginFrame úgyis ignorálni fogja ezt a shapeet
+        return;
+
+    this->intermediateVertexCount = intermediatePointCount;
 
     this->topLeftX = leftPoints[0].x;
     this->topRightX = rightPoints[0].x;

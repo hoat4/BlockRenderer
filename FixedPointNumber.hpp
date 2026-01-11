@@ -54,8 +54,16 @@ class FixedPointNumber {
             return value > other.value;
         }
 
+        inline bool operator > (int other) {
+            return other < -32768 || other <= 32767 && value > other << 16;
+        }
+
         inline bool operator < (FixedPointNumber other) {
             return value < other.value;
+        }
+
+        inline bool operator < (int other) {
+            return other > 32767 || other >= -32768 && value < other << 16;
         }
 
         inline FixedPointNumber operator + (FixedPointNumber other) {

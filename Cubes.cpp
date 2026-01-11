@@ -3,47 +3,20 @@
 #include <stdio.h>
 
 Cubes::Cubes() : cameraPos(Point3D(FixedPointNumber::zero(), FixedPointNumber::zero(), FixedPointNumber::zero())) {
-    
-    faces.push_back({
-            .cubePos = Point3DInt(1, 0, 5),
-            .side = FACE_SIDE_SOUTH,
-            .color = 0xFFFF0000,
-            .updatedAtFrame = 0,
-            .cachedShape = NULL
-                    });
-
-    faces.push_back({
-            .cubePos = Point3DInt(1, 0, 5),
-            .side = FACE_SIDE_WEST,
-            .color = 0xFFFFFF00,
-            .updatedAtFrame = 0,
-            .cachedShape = NULL
-                    });
-
-    faces.push_back({
-            .cubePos = Point3DInt(1, -2, 5),
-            .side = FACE_SIDE_TOP,
-            .color = 0xFF00FF00,
-            .updatedAtFrame = 0,
-            .cachedShape = NULL
-                    });
-
-    faces.push_back({
-            .cubePos = Point3DInt(1, -2, 5),
-            .side = FACE_SIDE_WEST,
-            .color = 0xFFFFFF00,
-            .updatedAtFrame = 0,
-            .cachedShape = NULL
-                    });
-    faces.push_back({
-            .cubePos = Point3DInt(1, -2, 5),
-            .side = FACE_SIDE_SOUTH,
-            .color = 0xFFFF0000,
-            .updatedAtFrame = 0,
-            .cachedShape = NULL
-                    });
+    addCube(Point3DInt(-1, 0, 5));
+    addCube(Point3DInt(1, 0, 5));
+    addCube(Point3DInt(1, -2, 5));
+    addCube(Point3DInt(-3, -2, 10));
+    addCube(Point3DInt(-4, 2, 10));
 
     frameID = 0;
+}
+
+void Cubes::addCube(Point3DInt p) {
+    cubes.push_back({
+        .pos = p,
+        .updatedAtFrame = 0,
+        .cachedShapes = {NULL, NULL, NULL, NULL, NULL, NULL} });
 }
 
 void Cubes::update() {
@@ -68,20 +41,61 @@ void Cubes::update() {
 
     rasterizer->shapes.erase(rasterizer->shapes.begin() + 1, rasterizer->shapes.end());
 
-    for (auto it = faces.begin(); it != faces.end(); ++it) {
-        CubeFace& t = *it;
-        t.updatedAtFrame = frameID;
-        if (t.cachedShape == NULL)
-            t.cachedShape = ConvexShape::create(4, 4, FixedPointNumber::ofInt(1), t.color);
-        rasterizer->shapes.push_back(t.cachedShape);
-        projectCubeFace(t);
+    for (auto it = cubes.begin(); it != cubes.end(); ++it) {
+        Cube& cube = *it;
+        cube.updatedAtFrame = frameID;
+        for (int face = 0; face < 6; face++) {
+            Color faceColor;
+            bool faceVisible;
+            switch (face) {
+            case FACE_TOP:
+                faceColor = 0xFFFF5555;
+                faceVisible = cameraPos.y > cube.pos.y + 1;
+                break;
+            case FACE_BOTTOM:
+                faceColor = 0xFFFF00FF;
+                faceVisible = cameraPos.y < cube.pos.y;
+                break;
+            case FACE_NORTH:
+                faceColor = 0xFFAA5500;
+                faceVisible = false;
+                break;
+            case FACE_WEST:
+                faceColor = 0xFF00FF00;
+                faceVisible = cameraPos.x < cube.pos.x;
+                break;
+            case FACE_EAST: 
+                faceColor = 0xFF0000FF; 
+                faceVisible = cameraPos.x > cube.pos.x + 1;
+                break;
+            case FACE_SOUTH: 
+                faceColor = 0xFFFFFF00; 
+                faceVisible = true;
+                break;
+            }
+            if (!faceVisible) {
+                if (cube.cachedShapes[face]) {
+                    delete cube.cachedShapes[face];
+                    cube.cachedShapes[face] = NULL;
+                }
+                continue;
+            }
+            if (cube.cachedShapes[face] == NULL)
+                cube.cachedShapes[face] = ConvexShape::create(4, 4,
+                                                              FixedPointNumber::ofInt(1), faceColor);
+            rasterizer->shapes.push_back(cube.cachedShapes[face]);
+            projectCubeFace(cube, (CubeFace)face);
+        }
     }
 
-    for (auto it = faces.begin(); it != faces.end(); ++it) {
-        CubeFace& t = *it;
-        if (t.updatedAtFrame != frameID && t.cachedShape != NULL) {
-            delete t.cachedShape;
-            t.cachedShape = NULL;
+    for (auto it = cubes.begin(); it != cubes.end(); ++it) {
+        Cube& t = *it;
+        if (t.updatedAtFrame != frameID && t.updatedAtFrame != 0) {
+            for (int face = 0; face < 6; face++) {
+                delete t.cachedShapes[face];
+                t.cachedShapes[face] = NULL;
+            }
+            t.updatedAtFrame = 0;
         }
     }
 }
@@ -95,20 +109,20 @@ Point3DInt CUBE_VERTEX_OFFSETS[] = {
     /* EAST */ Point3DInt(1, 1, 1), Point3DInt(1, 1, 0), Point3DInt(1, 0, 1), Point3DInt(1, 0, 0),
 };
 
-void Cubes::projectCubeFace(CubeFace& face) {
+void Cubes::projectCubeFace(Cube& cube, CubeFace face) {
     // kamera pozíció és forgás alapján eliminálni lehetne a sortot
 
     std::vector<Point2D> points;
 
-    points.push_back(projectPoint(face.cubePos + CUBE_VERTEX_OFFSETS[face.side * 4]));
-    points.push_back(projectPoint(face.cubePos + CUBE_VERTEX_OFFSETS[face.side * 4 + 1]));
-    points.push_back(projectPoint(face.cubePos + CUBE_VERTEX_OFFSETS[face.side * 4 + 2]));
-    points.push_back(projectPoint(face.cubePos + CUBE_VERTEX_OFFSETS[face.side * 4 + 3]));
+    points.push_back(projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4]));
+    points.push_back(projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 1]));
+    points.push_back(projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 2]));
+    points.push_back(projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 3]));
 
     std::sort(points.begin(), points.end(), [](Point2D a, Point2D b) {
         return a.y == b.y ? a.x < b.x : a.y < b.y;});
 
-        /*
+    /*
 printf("projected points: %d,%d; %d,%d; %d,%d; %d,%d\n",
        points[0].x.floor(), points[0].y.floor(),
        points[1].x.floor(), points[1].y.floor(),
@@ -116,6 +130,7 @@ printf("projected points: %d,%d; %d,%d; %d,%d; %d,%d\n",
        points[3].x.floor(), points[3].y.floor()
 );
 */
+
 
     std::vector<Point2D> leftPoints, rightPoints;
 
@@ -137,7 +152,7 @@ printf("projected points: %d,%d; %d,%d; %d,%d; %d,%d\n",
     leftPoints.push_back(points[3]);
     rightPoints.push_back(points[3]);
 
-    face.cachedShape->modifyPoints(leftPoints, rightPoints);
+    cube.cachedShapes[face]->modifyPoints(leftPoints, rightPoints);
 }
 
 Point2D Cubes::projectPoint(Point3DInt p) {
