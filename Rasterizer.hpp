@@ -41,6 +41,7 @@ class ConvexShape {
 
     Color color;
 
+    int maxIntermediateVertexCount;
     int intermediateVertexCount;
 
     // Rasterizer::shapeListsByLine-ben használva
@@ -72,6 +73,13 @@ class ConvexShape {
      * valamint az utolsó pont y-ja is ugyanaz legyen mindkettő listában.
      */
     static ConvexShape* create(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints, FixedPointNumber z, Color color);
+
+    /**
+     * Ezután a modifyPointsot meg kell hívni.
+     */
+    static ConvexShape* create(int maxLeftPoints, int maxRightPoints, FixedPointNumber z, Color color);
+
+    void modifyPoints(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints);
 
     private:
     static FixedPointNumber slope(Point2D top, Point2D bottom);

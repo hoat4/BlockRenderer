@@ -39,7 +39,7 @@ pico_sdk_init()
 
 #add_executable(BlockRenderer BlockRenderer.cpp dvhstx.cpp dvi.cpp intel_one_mono_2bpp.c)
 add_executable(BlockRenderer 
-    BlockRenderer.cpp DVIDisplay.cpp Rasterizer.cpp TriangleDemo.cpp)
+    BlockRenderer.cpp DVIDisplay.cpp Rasterizer.cpp TriangleDemo.cpp Cubes.cpp)
 
 pico_set_program_name(BlockRenderer "BlockRenderer")
 pico_set_program_version(BlockRenderer "0.1")

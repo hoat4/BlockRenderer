@@ -62,11 +62,12 @@ void Rasterizer::addToActiveList(ConvexShape* shapeToAdd) {
         printActiveShapes();
         printf("Add %04x at %d-%d\n", shapeToAdd->color, shapeToAdd->leftX, shapeToAdd->rightX);
     }
-    ConvexShape* shape = activeShapes;
     ConvexShape* addAfter = NULL;
     for (ConvexShape* shape = activeShapes; shape && shape->leftX <= shapeToAdd->leftX; shape = shape->nextInActiveList) {
         addAfter = shape;
     }
+    if (addAfter == shapeToAdd)
+        throw "shape already in active list";
     if (!addAfter) {
         shapeToAdd->prevInActiveList = NULL;
         shapeToAdd->nextInActiveList = activeShapes;
@@ -308,6 +309,31 @@ ConvexShape* ConvexShape::create(
     FixedPointNumber z,
     Color color) {
 
+    ConvexShape* shape = create(leftPoints.size(), rightPoints.size(), z, color);
+    shape->modifyPoints(leftPoints, rightPoints);
+    return shape;
+}
+
+ConvexShape* ConvexShape::create(
+    int maxLeftVertexCount, int maxRightVertexCount,
+    FixedPointNumber z,
+    Color color) {
+
+    if (maxLeftVertexCount < 2 || maxRightVertexCount < 2)
+        throw "too few points";
+    int maxIntermediatePointCount = maxLeftVertexCount - 2 + maxRightVertexCount - 2;
+
+    ConvexShape* shape = (ConvexShape*)malloc(
+        sizeof(ConvexShape) + sizeof(IntermediateVertex) * maxIntermediatePointCount);
+
+    shape->color = color;
+    shape->maxIntermediateVertexCount = maxIntermediatePointCount;
+    shape->z = z;
+
+    return shape;
+}
+
+void ConvexShape::modifyPoints(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints) {
     if (leftPoints.size() < 2 || rightPoints.size() < 2)
         throw "too few points";
     if (leftPoints[0].y != rightPoints[0].y)
@@ -316,42 +342,38 @@ ConvexShape* ConvexShape::create(
         throw "bottom point Y coordinate differs";
     int intermediatePointCount = leftPoints.size() - 2 + rightPoints.size() - 2;
 
-    ConvexShape* shape = (ConvexShape*)malloc(
-        sizeof(ConvexShape) + sizeof(IntermediateVertex) * intermediatePointCount);
+    if (this->maxIntermediateVertexCount < intermediatePointCount)
+        throw "intermediate vertex count too large";
 
-    shape->top = leftPoints.front().y.floor();
-    shape->bottom = leftPoints.back().y.ceil();
+    this->intermediateVertexCount = intermediatePointCount;
 
-    shape->topLeftX = leftPoints[0].x;
-    shape->topRightX = rightPoints[0].x;
-    shape->topLeftSlope = (leftPoints[1].x - leftPoints[0].x) /
+    this->top = leftPoints.front().y.floor();
+    this->bottom = leftPoints.back().y.ceil();
+
+    this->topLeftX = leftPoints[0].x;
+    this->topRightX = rightPoints[0].x;
+    this->topLeftSlope = (leftPoints[1].x - leftPoints[0].x) /
         (leftPoints[1].y.floor() - leftPoints[0].y.floor());
-    shape->topRightSlope = (rightPoints[1].x - rightPoints[0].x) /
+    this->topRightSlope = (rightPoints[1].x - rightPoints[0].x) /
         (rightPoints[1].y.floor() - rightPoints[0].y.floor());
-
-    shape->color = color;
-    shape->intermediateVertexCount = intermediatePointCount;
-    shape->z = z;
 
     for (int i = 1, j = 1, v = 0; ; ) {
         if (i < leftPoints.size() - 1) {
             if (j < rightPoints.size() - 1 && rightPoints[j].y < leftPoints[i].y) {
-                shape->intermediateVertices[v++] =
+                this->intermediateVertices[v++] =
                     makeIntermediateVertex(rightPoints[j], rightPoints[j + 1], false);
                 j++;
             } else {
-                shape->intermediateVertices[v++] =
+                this->intermediateVertices[v++] =
                     makeIntermediateVertex(leftPoints[i], leftPoints[i + 1], true);
                 i++;
             }
         } else if (j < rightPoints.size() - 1) {
-            shape->intermediateVertices[v++] =
+            this->intermediateVertices[v++] =
                 makeIntermediateVertex(rightPoints[j], rightPoints[j + 1], false);
             j++;
         } else {
             break;
         }
     }
-
-    return shape;
 }

@@ -4,6 +4,7 @@
 
 #include "BlockRenderer.hpp"
 #include "TriangleDemo.hpp"
+#include "Cubes.hpp"
 
 void vacak() {
     gpio_init(PICO_DEFAULT_LED_PIN);
@@ -40,7 +41,7 @@ Game::Game(int width, int height) :
     // érzékelje
     expectedY = height;
 
-    scene = new TriangleDemo();
+    scene = new Cubes();
     scene->rasterizer = &rasterizer;
 }
 
