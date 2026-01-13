@@ -7,7 +7,7 @@ bool ColorFill::isOpaque() {
 }
 
 void ColorFill::fillSpan(uint16_t* from, uint16_t* to,
-                         std::vector<ConvexShape*> shapeStack,
+                         std::vector<ConvexShape*>& shapeStack,
                          int x, int y) {
     int firstOpaque = shapeStack.size() - 1;
     while (!shapeStack[firstOpaque]->fill->isOpaque()) {
@@ -58,7 +58,7 @@ Color ColorFill::blendColorsDstOpaque(Color dst, Color src) {
 }
 
 void TextureFill::fillSpan(uint16_t* from, uint16_t* to,
-                           std::vector<ConvexShape*> shapeStack,
+                           std::vector<ConvexShape*>& shapeStack,
                            int x, int y) {
     FixedPointNumber u = uAtLeftTop + uByX * x + uByY * y;
     FixedPointNumber v = vAtLeftTop + vByX * x + vByY * y;

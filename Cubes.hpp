@@ -42,6 +42,10 @@ enum CubeFace {
     FACE_EAST
 };
 
+enum CubeType {
+    DIRT, GRASS
+};
+
 class Cubes : public Scene {
     std::vector<Cube> cubes;
     uint64_t frameID;
@@ -52,7 +56,7 @@ class Cubes : public Scene {
     void update();
 
     private:
-    void addCube(Point3DInt pos);
+    void addCube(Point3DInt pos, CubeType type);
     void projectCubeFace(Cube& cube, CubeFace face, TextureFill& textureFill);
     Point2D projectPoint(Point3DInt p);
 };
@@ -60,6 +64,7 @@ class Cubes : public Scene {
 struct Cube {
 
     Point3DInt pos;
+    CubeType type;
 
     uint64_t updatedAtFrame;
     ConvexShape* cachedShapes[6];

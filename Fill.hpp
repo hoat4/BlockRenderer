@@ -13,7 +13,7 @@ class Fill {
 public:
     virtual bool isOpaque() = 0;
     virtual void fillSpan(uint16_t* from, uint16_t* to,
-                          std::vector<ConvexShape*> shapeStack,
+                          std::vector<ConvexShape*>& shapeStack,
                           int relativeX, int relativeY);
     virtual std::string toString() = 0;
 };
@@ -27,7 +27,7 @@ public:
 
     virtual bool isOpaque();
     virtual void fillSpan(uint16_t* from, uint16_t* to,
-                          std::vector<ConvexShape*> shapeStack,
+                          std::vector<ConvexShape*>& shapeStack,
                           int relativeX, int relativeY);
     virtual std::string toString();
 
@@ -53,7 +53,7 @@ public:
 
     virtual bool isOpaque();
     virtual void fillSpan(uint16_t* from, uint16_t* to,
-                          std::vector<ConvexShape*> shapeStack,
+                          std::vector<ConvexShape*>& shapeStack,
                           int relativeX, int relativeY);
     virtual std::string toString();
 };

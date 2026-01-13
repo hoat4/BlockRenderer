@@ -4,23 +4,20 @@
 #include "textures.hpp"
 
 Cubes::Cubes() : cameraPos(Point3D(FixedPointNumber::zero(), FixedPointNumber::zero(), FixedPointNumber::zero())) {
-    /*
-    addCube(Point3DInt(-1, 0, 5));
-    addCube(Point3DInt(1, 0, 5));
-    */
-    addCube(Point3DInt(1, -2, 5));
-    /*
-    addCube(Point3DInt(-3, -2, 10));
-    addCube(Point3DInt(-3, 2, 10));
-    addCube(Point3DInt(1, -1, 4));
-    */
+    addCube(Point3DInt(1, -2, 5), GRASS);
+    addCube(Point3DInt(-2, -2, 5), DIRT);
+    addCube(Point3DInt(-1, -2, 5), DIRT);
+    addCube(Point3DInt(-2, -2, 6), DIRT);
+    addCube(Point3DInt(-2, -2, 7), DIRT);
+//    addCube(Point3DInt(-1, -2, 7), DIRT);
 
     frameID = 0;
 }
 
-void Cubes::addCube(Point3DInt p) {
+void Cubes::addCube(Point3DInt p, CubeType type) {
     cubes.push_back({
         .pos = p,
+        .type = type,
         .updatedAtFrame = 0,
         .cachedShapes = {NULL, NULL, NULL, NULL, NULL, NULL} });
 }
@@ -90,7 +87,10 @@ void Cubes::update() {
             ConvexShape* faceShape = cube.cachedShapes[face];
             if (faceShape == NULL) {
                 TextureFill* textureFill = new TextureFill();
-                textureFill->texture = TEXTURE;
+                textureFill->texture = cube.type == GRASS ? 
+                    face == FACE_TOP ? GRASS_TOP_TEXTURE :
+                    face == FACE_BOTTOM ? DIRT_TEXTURE : GRASS_SIDE_TEXTURE : 
+                    DIRT_TEXTURE;
                 cube.cachedShapes[face] = faceShape = ConvexShape::create(4, 4, textureFill);
             }
 
