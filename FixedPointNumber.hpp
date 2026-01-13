@@ -12,6 +12,8 @@ class FixedPointNumber {
         FixedPointNumber(int value) : value(value) {}
 
     public:
+        FixedPointNumber() : value(0) {}
+
         static inline FixedPointNumber ofInt(int i) {
             return FixedPointNumber(i << 16);
         }
@@ -83,6 +85,10 @@ class FixedPointNumber {
             return FixedPointNumber(value - other.value);
         }
 
+        inline FixedPointNumber operator - (int other) {
+            return *this - FixedPointNumber::ofInt(other);
+        }
+
         inline void operator += (FixedPointNumber other) {
             value += other.value;
         }
@@ -116,5 +122,13 @@ class FixedPointNumber {
                                                FixedPointNumber c) {
             int64_t al = a.value, bl = b.value, cl = c.value;
             return (al*al + bl*bl + cl*cl) >> 32;
+        }
+
+        inline float toFloat() {
+            return ((float) value) / 65536;
+        }
+
+        inline static FixedPointNumber ofFloat(float f) {
+            return FixedPointNumber((int) (f * 65536.0));
         }
 };

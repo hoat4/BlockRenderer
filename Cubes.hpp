@@ -53,7 +53,7 @@ class Cubes : public Scene {
 
     private:
     void addCube(Point3DInt pos);
-    void projectCubeFace(Cube& cube, CubeFace face);
+    void projectCubeFace(Cube& cube, CubeFace face, TextureFill& textureFill);
     Point2D projectPoint(Point3DInt p);
 };
 

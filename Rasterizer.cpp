@@ -1,6 +1,7 @@
 #include "Rasterizer.hpp"
 #include <stdio.h>
 #include <stdlib.h>
+#include <memory>
 
 const bool TRACE_CHANGE_ACTIVE_LIST = false;
 const bool TRACE_FILLS = false;
@@ -64,7 +65,8 @@ void Rasterizer::addToActiveList(ConvexShape* shapeToAdd) {
     if (TRACE_CHANGE_ACTIVE_LIST || TRACE_FILLS) {
         printf("Before addToActiveList: ");
         printActiveShapes();
-        printf("Add %04x at %d-%d\n", shapeToAdd->color, shapeToAdd->leftX, shapeToAdd->rightX);
+        printf("Add %s at %d-%d\n", shapeToAdd->fill->toString().c_str(),
+               shapeToAdd->leftX, shapeToAdd->rightX);
     }
     ConvexShape* addAfter = NULL;
     for (ConvexShape* shape = activeShapes; shape && shape->leftX <= shapeToAdd->leftX; shape = shape->nextInActiveList) {
@@ -89,7 +91,7 @@ void Rasterizer::addToActiveList(ConvexShape* shapeToAdd) {
 
 void Rasterizer::removeFromActiveList(ConvexShape* shape) {
     if (TRACE_CHANGE_ACTIVE_LIST || TRACE_FILLS)
-        printf("Remove %04x\n", shape->color);
+        printf("Remove %s\n", shape->fill->toString().c_str());
     if (shape->prevInActiveList)
         shape->prevInActiveList->nextInActiveList = shape->nextInActiveList;
     else
@@ -183,7 +185,7 @@ bool Rasterizer::processBreaksOnCurrentLine(ConvexShape* shape) {
 void Rasterizer::printActiveShapes() {
     printf("Active shapes: ");
     for (ConvexShape* shape = activeShapes; shape; shape = shape->nextInActiveList) {
-        printf("%04x at %d-%d, ", shape->color, shape->leftX.floor(), shape->rightX.floor());
+        printf("%s at %d-%d, ", shape->fill->toString().c_str(), shape->leftX.floor(), shape->rightX.floor());
     }
     printf("\n");
 }
@@ -253,46 +255,11 @@ void Rasterizer::fillSpan(uint16_t* buffer,
         throw "shape stack empty";
     }
 
-    int firstOpaque = shapeStack.size() - 1;
-    while ((shapeStack[firstOpaque]->color & 0xFF000000) != 0xFF000000) {
-        if (firstOpaque == 0)
-            throw "no opaque shapes on stack";
-        firstOpaque--;
-    }
-
-    Color color = shapeStack[firstOpaque]->color;
-    for (int i = firstOpaque + 1; i < shapeStack.size(); i++)
-        color = blendColorsDstOpaque(color, shapeStack[i]->color);
-
-    unsigned int r = color >> 16 & 0xFF, g = color >> 8 & 0xFF, b = color & 0xFF;
-
-    uint16_t rgb565 = ((r & 0b11111000) << 8) | ((g & 0b11111100) << 3) | ((b & 0b11111000) >> 3);
-
+    ConvexShape* lastShape = shapeStack.back();
     if (TRACE_FILLS)
-        printf("fill with %04x\n", rgb565);
+        printf("fill with %s\n", lastShape->fill->toString().c_str());
 
-    for (; from < to; from++)
-        buffer[from] = rgb565;
-}
-
-Color Rasterizer::blendColorsDstOpaque(Color dst, Color src) {
-    unsigned int aa = src >> 24;
-    if (aa == 255) {
-        return src;
-    }
-
-    unsigned int ra = src >> 16 & 0xFF, rb = dst >> 16 & 0xFF;
-    unsigned int ga = src >> 8 & 0xFF, gb = dst >> 8 & 0xFF;
-    unsigned int ba = src & 0xFF, bb = dst & 0xFF;
-
-    unsigned int ro = ra * aa + rb * (255 - aa) + 127;
-    unsigned int go = ga * aa + gb * (255 - aa) + 127;
-    unsigned int bo = ba * aa + bb * (255 - aa) + 127;
-
-    //printf("(%d, %d, %d, %d) over (%d, %d, %d, %d): (%d, %d, %d, %d)\n", 
-    //    ra, ga, ba, aa, rb, gb, bb, ab, ro, go, bo, ao);
-
-    return 0xFF000000 | (ro & 0xFF00) << 8 | (go & 0xFF00) | bo >> 8;
+    lastShape->fill->fillSpan(&buffer[from], &buffer[to], shapeStack, from, y);
 }
 
 FixedPointNumber ConvexShape::slope(Point2D top, Point2D bottom) {
@@ -311,16 +278,16 @@ IntermediateVertex ConvexShape::makeIntermediateVertex(Point2D top, Point2D bott
 ConvexShape* ConvexShape::create(
     std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints,
     FixedPointNumber z,
-    Color color) {
+    Fill* fill) {
 
-    ConvexShape* shape = create(leftPoints.size(), rightPoints.size(), color);
+    ConvexShape* shape = create(leftPoints.size(), rightPoints.size(), fill);
     shape->modifyPoints(leftPoints, rightPoints, z);
     return shape;
 }
 
 ConvexShape* ConvexShape::create(
     int maxLeftVertexCount, int maxRightVertexCount,
-    Color color) {
+    Fill* fill) {
 
     if (maxLeftVertexCount < 2 || maxRightVertexCount < 2)
         throw "too few points";
@@ -329,14 +296,15 @@ ConvexShape* ConvexShape::create(
     ConvexShape* shape = (ConvexShape*)malloc(
         sizeof(ConvexShape) + sizeof(IntermediateVertex) * maxIntermediatePointCount);
 
-    shape->color = color;
+    // unique_ptr.reset megpróbálná törölni a memóriaszemetet
+    shape->fill = fill;
     shape->maxIntermediateVertexCount = maxIntermediatePointCount;
 
     return shape;
 }
 
-void ConvexShape::modifyPoints(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints, 
-                                FixedPointNumber z) {
+void ConvexShape::modifyPoints(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints,
+                               FixedPointNumber z) {
     if (leftPoints.size() < 2 || rightPoints.size() < 2)
         throw "too few points";
     if (leftPoints[0].y != rightPoints[0].y)
@@ -385,4 +353,8 @@ void ConvexShape::modifyPoints(std::vector<Point2D> leftPoints, std::vector<Poin
             break;
         }
     }
+}
+
+ConvexShape::~ConvexShape() {
+    delete fill;
 }

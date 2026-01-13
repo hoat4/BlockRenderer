@@ -37,7 +37,7 @@ void TriangleDemo::update() {
             { x: FixedPointNumber::ofInt(rasterizer->screenWidth()), y : FixedPointNumber::ofInt(rasterizer->screenHeight()) },
         },
         FixedPointNumber::ofInt(0),
-        0xFFFFFFFF
+        new ColorFill(0xFFFFFFFF)
         );
     rasterizer->shapes.push_back(background);
 
@@ -96,6 +96,6 @@ ConvexShape* Triangle::toShape(FixedPointNumber z) {
             }
         },
         z,
-        color
+        new ColorFill(color)
     );
 }

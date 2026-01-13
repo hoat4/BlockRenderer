@@ -2,8 +2,10 @@
 
 #include "FixedPointNumber.hpp"
 #include <vector>
+#include "Fill.hpp"
+#include <memory>
 
-typedef uint32_t Color; // TODO
+class Fill;
 
 struct Point2D {
     FixedPointNumber x;
@@ -39,8 +41,10 @@ class ConvexShape {
 
     FixedPointNumber z;
 
-    Color color;
+public: // Fill.fillSpan miatt
+    Fill* fill; // törölve lesz ~ConvexShape-ben
 
+private:
     int maxIntermediateVertexCount;
     int intermediateVertexCount;
 
@@ -60,6 +64,8 @@ class ConvexShape {
     FixedPointNumber rightX;
     FixedPointNumber rightSlope;
 
+    int minXFloor;
+
     /**
      * Fentről lefele haladva.
      */
@@ -72,15 +78,19 @@ public:
      * A pontok fentről lefele menjenek, és az első pont y-ja ugyanaz legyen mindkettő listában,
      * valamint az utolsó pont y-ja is ugyanaz legyen mindkettő listában.
      */
-    static ConvexShape* create(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints, FixedPointNumber z, Color color);
+    static ConvexShape* create(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints,
+                               FixedPointNumber z, Fill* fill);
 
     /**
      * Ezután a modifyPointsot meg kell hívni.
      */
-    static ConvexShape* create(int maxLeftPoints, int maxRightPoints, Color color);
+    static ConvexShape* create(int maxLeftPoints, int maxRightPoints,
+                               Fill* fill);
 
     void modifyPoints(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints,
                       FixedPointNumber z);
+
+    ~ConvexShape();
 
 private:
     static FixedPointNumber slope(Point2D top, Point2D bottom);
@@ -121,5 +131,4 @@ private:
     void printActiveShapes();
     void renderSpans(uint16_t* buffer);
     void fillSpan(uint16_t* buffer, FixedPointNumber from, FixedPointNumber to);
-    Color blendColorsDstOpaque(Color dst, Color src);
 };
