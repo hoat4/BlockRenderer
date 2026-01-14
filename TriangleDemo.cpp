@@ -15,12 +15,12 @@ void TriangleDemo::update() {
     for (auto it = triangles.begin(); it != triangles.end(); ++it) {
         Triangle& t = *it;
 
-        if (t.pos.x + t.dir.x < FixedPointNumber::zero() ||
-            t.pos.x + t.dir.x + FixedPointNumber::ofInt(100) > FixedPointNumber::ofInt(rasterizer->screenWidth())) {
+        if (t.pos.x + t.dir.x < 0.0f ||
+            t.pos.x + t.dir.x + 100.0f > rasterizer->screenWidth()) {
             t.dir.x = t.dir.x * -1;
         }
-        if (t.pos.y + t.dir.y < FixedPointNumber::zero() ||
-            t.pos.y + t.dir.y + FixedPointNumber::ofInt(100) > FixedPointNumber::ofInt(rasterizer->screenHeight())) {
+        if (t.pos.y + t.dir.y < 0.0f ||
+            t.pos.y + t.dir.y + 100.0f > rasterizer->screenHeight()) {
             t.dir.y = t.dir.y * -1;
         }
 
@@ -29,32 +29,32 @@ void TriangleDemo::update() {
 
     ConvexShape* background = ConvexShape::create(
         {
-            { x: FixedPointNumber::zero(), y : FixedPointNumber::zero() },
-            { x: FixedPointNumber::zero(), y : FixedPointNumber::ofInt(rasterizer->screenHeight()) }
+            { x: 0.0f, y : 0.0f },
+            { x: 0.0f, y : (float) rasterizer->screenHeight() }
         },
         {
-            { x: FixedPointNumber::ofInt(rasterizer->screenWidth()), y : FixedPointNumber::zero() },
-            { x: FixedPointNumber::ofInt(rasterizer->screenWidth()), y : FixedPointNumber::ofInt(rasterizer->screenHeight()) },
+            { x: (float) rasterizer->screenWidth(), y : 0.0f },
+            { x: (float) rasterizer->screenWidth(), y : (float) rasterizer->screenHeight() },
         },
-        FixedPointNumber::ofInt(0),
+        0.0f,
         new ColorFill(0xFFFFFFFF)
         );
     rasterizer->shapes.push_back(background);
 
     for (int i = 0; i < triangles.size(); i++) {
-        rasterizer->shapes.push_back(triangles[i].toShape(FixedPointNumber::ofInt(i + 1)));
+        rasterizer->shapes.push_back(triangles[i].toShape(i + 1));
     }
 }
 
 
 Triangle::Triangle() :
     pos({
-        .x = FixedPointNumber::ofInt(get_rand_32() % (640 - 100)),
-         .y = FixedPointNumber::ofInt(get_rand_32() % (480 - 100))
+        .x = get_rand_32() % (640 - 100),
+         .y = get_rand_32() % (480 - 100)
         }),
     dir({
-        .x = FixedPointNumber::ofInt(sqrt(get_rand_32() % 10000) - 50) / 50,
-        .y = FixedPointNumber::ofInt(sqrt(get_rand_32() % 10000) - 50) / 50,
+        .x = (float) (sqrt(get_rand_32() % 10000) - 50) / 50,
+        .y = (float) (sqrt(get_rand_32() % 10000) - 50) / 50,
         }),
         color(get_rand_32() & 0x00FFFFFF | 0xAA000000) {
 }
@@ -73,26 +73,26 @@ uint32_t Triangle::sqrt(uint32_t x) {
 }
 
 
-ConvexShape* Triangle::toShape(FixedPointNumber z) {
+ConvexShape* Triangle::toShape(float z) {
     return ConvexShape::create(
         {
             {
-                .x = pos.x + FixedPointNumber::ofInt(50),
+                .x = pos.x + 50.0f,
                 .y = pos.y
             },
             {
                 .x = pos.x,
-                .y = pos.y + FixedPointNumber::ofInt(100)
+                .y = pos.y + 100.0f
             }
         },
         {
             {
-                .x = pos.x + FixedPointNumber::ofInt(50),
+                .x = pos.x + 50.0f,
                 .y = pos.y
             },
             {
-                .x = pos.x + FixedPointNumber::ofInt(100),
-                .y = pos.y + FixedPointNumber::ofInt(100)
+                .x = pos.x + 100.0f,
+                .y = pos.y + 100.0f
             }
         },
         z,

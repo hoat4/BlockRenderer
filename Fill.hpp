@@ -3,7 +3,7 @@
 #include <vector>
 #include <string>
 #include "Rasterizer.hpp"
-#include "FixedPointNumber.hpp"
+#include <stdint.h>
 
 typedef uint32_t Color; // TODO
 
@@ -35,6 +35,19 @@ private:
     static Color blendColorsDstOpaque(Color dst, Color src);
 };
 
+struct LerpableData {
+    /**
+     * Value at screen left top (0, 0)
+     */
+    float base;
+    float byX;
+    float byY;
+
+    float valueAt(float x, float y) {
+        return base + x * byX + y * byY;
+    }
+};
+
 /**
  * 16x16-os méret, átlátszóság nélkül
  */
@@ -42,12 +55,11 @@ class TextureFill : public Fill {
 
 public:
     const uint16_t* texture;
-    FixedPointNumber uAtLeftTop;
-    FixedPointNumber vAtLeftTop;
-    FixedPointNumber uByX;
-    FixedPointNumber uByY;
-    FixedPointNumber vByX;
-    FixedPointNumber vByY;
+    float baseX;
+    float baseY;
+    LerpableData zReciprocal;
+    LerpableData uPerZ;
+    LerpableData vPerZ;
 
     TextureFill() {}
 

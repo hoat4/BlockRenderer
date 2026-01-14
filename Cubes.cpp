@@ -2,14 +2,17 @@
 #include <algorithm>
 #include <stdio.h>
 #include "textures.hpp"
+#include "math.h"
 
-Cubes::Cubes() : cameraPos(Point3D(FixedPointNumber::zero(), FixedPointNumber::zero(), FixedPointNumber::zero())) {
+Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
     addCube(Point3DInt(1, -2, 5), GRASS);
     addCube(Point3DInt(-2, -2, 5), DIRT);
+    /*
     addCube(Point3DInt(-1, -2, 5), DIRT);
     addCube(Point3DInt(-2, -2, 6), DIRT);
     addCube(Point3DInt(-2, -2, 7), DIRT);
-//    addCube(Point3DInt(-1, -2, 7), DIRT);
+    */
+    //    addCube(Point3DInt(-1, -2, 7), DIRT);
 
     frameID = 0;
 }
@@ -25,16 +28,18 @@ void Cubes::addCube(Point3DInt p, CubeType type) {
 void Cubes::update() {
     if (frameID == 0) {
         printf("create bg\n");
+        aspectRatio = (float) rasterizer->screenWidth() / (float) rasterizer->screenHeight();
+
         ConvexShape* background = ConvexShape::create(
             {
-                { x: FixedPointNumber::zero(), y : FixedPointNumber::zero() },
-                { x: FixedPointNumber::zero(), y : FixedPointNumber::ofInt(rasterizer->screenHeight()) }
+                { x: 0.0f, y : 0.0f },
+                { x: 0.0f, y : (float) rasterizer->screenHeight() }
             },
             {
-                { x: FixedPointNumber::ofInt(rasterizer->screenWidth()), y : FixedPointNumber::zero() },
-                { x: FixedPointNumber::ofInt(rasterizer->screenWidth()), y : FixedPointNumber::ofInt(rasterizer->screenHeight()) },
+                { x: (float) rasterizer->screenWidth(), y : 0.0f },
+                { x: (float) rasterizer->screenWidth(), y : (float) rasterizer->screenHeight() },
             },
-            FixedPointNumber::min(),
+            -std::numeric_limits<float>::infinity(),
             new ColorFill(0xFF55EEFF)
             );
         rasterizer->shapes.push_back(background);
@@ -87,16 +92,18 @@ void Cubes::update() {
             ConvexShape* faceShape = cube.cachedShapes[face];
             if (faceShape == NULL) {
                 TextureFill* textureFill = new TextureFill();
-                textureFill->texture = cube.type == GRASS ? 
+                textureFill->texture = cube.type == GRASS ?
                     face == FACE_TOP ? GRASS_TOP_TEXTURE :
-                    face == FACE_BOTTOM ? DIRT_TEXTURE : GRASS_SIDE_TEXTURE : 
+                    face == FACE_BOTTOM ? DIRT_TEXTURE : GRASS_SIDE_TEXTURE :
                     DIRT_TEXTURE;
                 cube.cachedShapes[face] = faceShape = ConvexShape::create(4, 4, textureFill);
             }
 
             rasterizer->shapes.push_back(faceShape);
-            projectCubeFace(cube, (CubeFace)face,
-                            *reinterpret_cast<TextureFill*>(faceShape->fill));
+            Point2D point = projectCubeFace(cube, (CubeFace)face);
+            computeZUVMatrix(cube, (CubeFace)face,
+                             *reinterpret_cast<TextureFill*>(faceShape->fill), 
+                            point);
         }
     }
 
@@ -126,52 +133,18 @@ Point3DInt CUBE_VERTEX_OFFSETS[] = {
     /* EAST */   Point3DInt(1, 1, 0), Point3DInt(1, 1, 1), Point3DInt(1, 0, 0), Point3DInt(1, 0, 1),
 };
 
-void Cubes::projectCubeFace(Cube& cube, CubeFace face, TextureFill& textureFill) {
+Point2D Cubes::projectCubeFace(Cube& cube, CubeFace face) {
     // kamera pozíció és forgás alapján eliminálni lehetne a sortot
 
     std::vector<Point2D> points;
 
-    Point2D pointAtTextureLeftTop = projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4]);
-    Point2D pointAtTextureRightTop = projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 1]);
-    Point2D pointAtTextureLeftBottom = projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 2]);
-    Point2D pointAtTextureRightBottom = projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 3]);
-
-    float m00 = (pointAtTextureRightTop.x.toFloat() - pointAtTextureLeftTop.x.toFloat()) / 15;
-    float m01 = (pointAtTextureLeftBottom.x.toFloat() - pointAtTextureLeftTop.x.toFloat()) / 15;
-    float m02 = pointAtTextureLeftTop.x.toFloat();
-    float m10 = (pointAtTextureRightTop.y.toFloat() - pointAtTextureLeftTop.y.toFloat()) / 15;
-    float m11 = (pointAtTextureLeftBottom.y.toFloat() - pointAtTextureLeftTop.y.toFloat()) / 15;
-    float m12 = pointAtTextureLeftTop.y.toFloat();
-    float detInv = 1 / (m00 * m11 - m01 * m10);
-    
-    /*
-    printf("SIDE %d\n", face);
-    printf("m:\n%f,%f,%f\n%f,%f,%f\n", m00, m01, m02, m10, m11, m12);
-    printf("devInv:%f\n", detInv);
-    */
-    
-
-    float im00 = m11 * detInv;
-    float im10 = -m10 * detInv;
-    float im01 = -m01 * detInv;
-    float im11 = m00 * detInv;
-    float im02 = (m01 * m12 - m11 * m02) * detInv;
-    float im12 = (m10 * m02 - m00 * m12) * detInv;
- //   printf("inverse:\n%f,%f,%f\n%f,%f,%f\n", im00, im01, im02, im10, im11, im12);
-    textureFill.uAtLeftTop = FixedPointNumber::ofFloat(im02);
-    textureFill.vAtLeftTop = FixedPointNumber::ofFloat(im12);
-    textureFill.uByX = FixedPointNumber::ofFloat(im00);
-    textureFill.vByX = FixedPointNumber::ofFloat(im10);
-    textureFill.uByY = FixedPointNumber::ofFloat(im01);
-    textureFill.vByY = FixedPointNumber::ofFloat(im11);
     //printf("uAtLeftTop:%d, uByX: %d\n",
-    //       textureFill.uAtLeftTop.floor(), textureFill.uByX.floor());
-           
+    //       textureFill.uAtLeftTop.floor(), textureFill.uByX.floor());           
 
-    points.push_back(pointAtTextureLeftTop);
-    points.push_back(pointAtTextureRightTop);
-    points.push_back(pointAtTextureLeftBottom);
-    points.push_back(pointAtTextureRightBottom);
+    points.push_back(projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4]));
+    points.push_back(projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 1]));
+    points.push_back(projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 2]));
+    points.push_back(projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 3]));
 
     std::sort(points.begin(), points.end(), [](Point2D a, Point2D b) {
         return a.y == b.y ? a.x < b.x : a.y < b.y;});
@@ -188,17 +161,17 @@ printf("projected points: %d,%d; %d,%d; %d,%d; %d,%d\n",
 
     std::vector<Point2D> leftPoints, rightPoints;
 
-    FixedPointNumber diagonalSlope = (points[3].x - points[0].x) / (points[3].y - points[0].y).floor();
+    float diagonalSlope = (points[3].x - points[0].x) / std::floor(points[3].y - points[0].y);
 
     leftPoints.push_back(points[0]);
     rightPoints.push_back(points[0]);
 
-    if (points[1].x < points[0].x + diagonalSlope * (points[1].y - points[0].y).floor())
+    if (points[1].x < points[0].x + diagonalSlope * std::floor(points[1].y - points[0].y))
         leftPoints.push_back(points[1]);
     else
         rightPoints.push_back(points[1]);
 
-    if (points[2].x < points[0].x + diagonalSlope * (points[2].y - points[0].y).floor())
+    if (points[2].x < points[0].x + diagonalSlope * std::floor(points[2].y - points[0].y))
         leftPoints.push_back(points[2]);
     else
         rightPoints.push_back(points[2]);
@@ -207,23 +180,107 @@ printf("projected points: %d,%d; %d,%d; %d,%d; %d,%d\n",
     rightPoints.push_back(points[3]);
 
     Point3D cubeCenter(
-        FixedPointNumber::ofInt(cube.pos.x) + FixedPointNumber::half(),
-        FixedPointNumber::ofInt(cube.pos.y) + FixedPointNumber::half(),
-        FixedPointNumber::ofInt(cube.pos.z) + FixedPointNumber::half()
+        cube.pos.x + 0.5f,
+        cube.pos.y + 0.5f,
+        cube.pos.z + 0.5f
     );
-    FixedPointNumber zIndex = Point3D::distanceSq(cubeCenter, cameraPos);
+    float zIndex = Point3D::distanceSq(cubeCenter, cameraPos);
 
     cube.cachedShapes[face]->modifyPoints(leftPoints, rightPoints, -zIndex);
+
+    return leftPoints[0];
 }
 
 Point2D Cubes::projectPoint(Point3DInt p) {
     //printf("project point %d,%d\n", p.x, p.y);
-    FixedPointNumber x = FixedPointNumber::ofInt(p.x * 500);
-    FixedPointNumber y = FixedPointNumber::ofInt(p.y * 500);
+    float x = p.x * rasterizer->screenWidth() / 2.0f;
+    float y = p.y * rasterizer->screenHeight() / 2.0f * aspectRatio;
     x = x / p.z;
     y = y / p.z;
     return {
-        .x = FixedPointNumber::ofInt(rasterizer->screenWidth()) / 2 + x,
-        .y = FixedPointNumber::ofInt(rasterizer->screenHeight()) / 2 - y
+        .x = rasterizer->screenWidth() / 2.0f + x,
+        .y = rasterizer->screenHeight() / 2.0f - y
+    };
+}
+
+void Cubes::computeZUVMatrix(Cube& cube, CubeFace face, TextureFill& textureFill, Point2D p) {
+    // "1/z, u/z and v/z are linear in screen space": 
+    // https://www.lysator.liu.se/~mikaelk/doc/perspectivetexture/
+
+    textureFill.baseX = p.x;
+    textureFill.baseY = p.y;
+    ZUV origin = computeZUV(cube, face, textureFill.baseX, textureFill.baseY);
+    ZUV right = computeZUV(cube, face, textureFill.baseX + 1, textureFill.baseY);
+    ZUV down = computeZUV(cube, face, textureFill.baseX, textureFill.baseY + 1);
+
+    if (face == FACE_SOUTH&&false) {
+        printf("\n");
+        printf("base: %f, %f\n", p.x, p.y);
+        printf("(0, 0): z: %f, u: %f, v: %f\n", 1/origin.zReciprocal, origin.uPerZ/origin.zReciprocal, origin.vPerZ/origin.zReciprocal);
+        printf("(1, 0): z: %f, u: %f, v: %f\n", 1/right.zReciprocal, right.uPerZ/right.zReciprocal, right.vPerZ/right.zReciprocal);
+        printf("(0, 1): z: %f, u: %f, v: %f\n", 1/down.zReciprocal, down.uPerZ/down.zReciprocal, down.vPerZ/down.zReciprocal);
+        printf("\n");
+    }
+
+    textureFill.zReciprocal.base = origin.zReciprocal;
+    textureFill.zReciprocal.byX = right.zReciprocal - origin.zReciprocal;
+    textureFill.zReciprocal.byY = down.zReciprocal - origin.zReciprocal;
+
+    textureFill.uPerZ.base = origin.uPerZ;
+    textureFill.uPerZ.byX = right.uPerZ - origin.uPerZ;
+    textureFill.uPerZ.byY = down.uPerZ - origin.uPerZ;
+
+    textureFill.vPerZ.base = origin.vPerZ;
+    textureFill.vPerZ.byX = right.vPerZ - origin.vPerZ;
+    textureFill.vPerZ.byY = down.vPerZ - origin.vPerZ;
+}
+
+ZUV Cubes::computeZUV(Cube& cube, CubeFace face, float x, float y) {
+    float xNormalized = x * 2.0 / rasterizer->screenWidth() - 1.0;
+    float yNormalized = (1.0 - y * 2.0 / rasterizer->screenHeight()) / aspectRatio;
+
+    float z;
+    float u;
+    float v;
+    switch (face) {
+    case FACE_NORTH:
+        z = cube.pos.z + 1;
+        u = cube.pos.x + 1 - xNormalized * z;
+        v = cube.pos.y + 1 - yNormalized * z;
+        break;
+    case FACE_SOUTH:
+        z = cube.pos.z;
+        u = xNormalized * z - cube.pos.x;
+        v = cube.pos.y + 1 - yNormalized * z;
+        break;
+    case FACE_WEST:
+        z = (float)cube.pos.x / xNormalized;
+        u = cube.pos.z + 1 - z;
+        v = cube.pos.y + 1 - yNormalized * z;
+        break;
+    case FACE_EAST:
+        z = (float)(cube.pos.x + 1) / xNormalized;
+        u = z - cube.pos.z;
+        v = cube.pos.y + 1 - yNormalized * z;
+        break;
+    case FACE_TOP:
+        z = (float)(cube.pos.y + 1) / yNormalized;
+        u = xNormalized * z - cube.pos.x;
+        v = cube.pos.z + 1 - z;
+        break;
+    case FACE_BOTTOM:
+        z = (float)cube.pos.y / yNormalized;
+        u = xNormalized * z - cube.pos.x;
+        v = z - cube.pos.z;
+        break;
+    }
+
+    u *= 15;
+    v *= 15;
+
+    return {
+        .zReciprocal = 1 / z,
+        .uPerZ = u / z,
+        .vPerZ = v / z
     };
 }

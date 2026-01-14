@@ -6,17 +6,17 @@ struct Point3DInt;
 
 
 struct Point3D {
-    FixedPointNumber x;
-    FixedPointNumber y;
-    FixedPointNumber z;
+    float x;
+    float y;
+    float z;
 
-    Point3D(FixedPointNumber x, FixedPointNumber y, FixedPointNumber z) : x(x), y(y), z(z) {}
+    Point3D(float x, float y, float z) : x(x), y(y), z(z) {}
 
-    inline static FixedPointNumber distanceSq(Point3D a, Point3D b) {
-        FixedPointNumber dx = a.x-b.x;
-        FixedPointNumber dy = a.y-b.y;
-        FixedPointNumber dz = a.z-b.z;
-        return FixedPointNumber::hypotSq(dx, dy, dz);
+    inline static float distanceSq(Point3D a, Point3D b) {
+        float dx = a.x-b.x;
+        float dy = a.y-b.y;
+        float dz = a.z-b.z;
+        return dx * dx + dy * dy + dz * dz; // FMA?
     }
 };
 
@@ -46,10 +46,17 @@ enum CubeType {
     DIRT, GRASS
 };
 
+struct ZUV {
+    float zReciprocal;
+    float uPerZ;
+    float vPerZ;
+};
+
 class Cubes : public Scene {
     std::vector<Cube> cubes;
     uint64_t frameID;
     Point3D cameraPos;
+    float aspectRatio;
 
     public:
     Cubes();
@@ -57,7 +64,13 @@ class Cubes : public Scene {
 
     private:
     void addCube(Point3DInt pos, CubeType type);
-    void projectCubeFace(Cube& cube, CubeFace face, TextureFill& textureFill);
+
+    /** 
+     * visszaad egy tetszőleges pontot, ami a kockán van
+     */
+    Point2D projectCubeFace(Cube& cube, CubeFace face);
+    ZUV computeZUV(Cube& cube, CubeFace face, float x, float y);
+    void computeZUVMatrix(Cube& cube, CubeFace face, TextureFill& textureFill, Point2D origin);
     Point2D projectPoint(Point3DInt p);
 };
 

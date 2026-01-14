@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <memory>
+#include <math.h>
 
 const bool TRACE_CHANGE_ACTIVE_LIST = false;
 const bool TRACE_FILLS = false;
@@ -185,7 +186,7 @@ bool Rasterizer::processBreaksOnCurrentLine(ConvexShape* shape) {
 void Rasterizer::printActiveShapes() {
     printf("Active shapes: ");
     for (ConvexShape* shape = activeShapes; shape; shape = shape->nextInActiveList) {
-        printf("%s at %d-%d, ", shape->fill->toString().c_str(), shape->leftX.floor(), shape->rightX.floor());
+        printf("%s at %f-%f, ", shape->fill->toString().c_str(), shape->leftX, shape->rightX);
     }
     printf("\n");
 }
@@ -198,11 +199,11 @@ void Rasterizer::renderSpans(uint16_t* buffer) {
         printActiveShapes();
     }
 
-    FixedPointNumber prevX = FixedPointNumber::zero();
+    float prevX = 0;
     ConvexShape* nextLeft = activeShapes;
     while (true) {
         int shapeWithNearestRight = -1;
-        FixedPointNumber nearestRight = FixedPointNumber::max();
+        float nearestRight = std::numeric_limits<float>::infinity();
         for (int i = 0; i < shapeStack.size(); i++) {
             if (shapeStack[i]->rightX < nearestRight) {
                 shapeWithNearestRight = i;
@@ -211,13 +212,13 @@ void Rasterizer::renderSpans(uint16_t* buffer) {
         }
         if (shapeWithNearestRight != -1 && (nextLeft == NULL || nearestRight <= nextLeft->leftX)) {
             if (TRACE_FILLS)
-                printf("RIGHT at %d-%d\n", prevX.floor(), nearestRight.floor());
+                printf("RIGHT at %f-%f\n", prevX, nearestRight);
             fillSpan(buffer, prevX, nearestRight);
             prevX = nearestRight;
             shapeStack.erase(shapeStack.begin() + shapeWithNearestRight);
         } else if (nextLeft) {
             if (TRACE_FILLS)
-                printf("LEFT at %d-%d\n", prevX.floor(), nextLeft->leftX.floor());
+                printf("LEFT at %f-%f\n", prevX, nextLeft->leftX);
             fillSpan(buffer, prevX, nextLeft->leftX);
             prevX = nextLeft->leftX;
 
@@ -242,16 +243,21 @@ void Rasterizer::renderSpans(uint16_t* buffer) {
         throw "activeShapes size not zero (at end)";
 }
 
+/**
+ * fromFP nem lehet negatív (mert intté kasztolás rosszul működne, de amúgy is értelmetlen)
+ */
 void Rasterizer::fillSpan(uint16_t* buffer,
-                          FixedPointNumber fromFP, FixedPointNumber toFP) {
+                          float fromFP, float toFP) {
+    if (fromFP < 0)
+        throw "negative fromFP";
 
-    int from = std::max(fromFP.floor(), 0);
-    int to = std::min(toFP.floor(), width);
+    int from = std::max((int)fromFP, 0);
+    int to = std::min((int)toFP, width);
     if (from >= to)
         return;
 
     if (shapeStack.empty()) {
-        printf("span: %d-%d\n", fromFP.floor(), toFP.floor());
+        printf("span: %f-%f\n", fromFP, toFP);
         throw "shape stack empty";
     }
 
@@ -262,13 +268,13 @@ void Rasterizer::fillSpan(uint16_t* buffer,
     lastShape->fill->fillSpan(&buffer[from], &buffer[to], shapeStack, from, y);
 }
 
-FixedPointNumber ConvexShape::slope(Point2D top, Point2D bottom) {
-    return (bottom.x - top.x) / (bottom.y.floor() - top.y.floor());
+float ConvexShape::slope(Point2D top, Point2D bottom) {
+    return (bottom.x - top.x) / (std::floor(bottom.y) - std::floor(top.y));
 }
 
 IntermediateVertex ConvexShape::makeIntermediateVertex(Point2D top, Point2D bottom, bool isLeft) {
     return {
-        .y = top.y.floor(),
+        .y = (int) std::floor(top.y),
         .isLeft = isLeft,
         .x = top.x,
         .slope = slope(top, bottom)
@@ -277,7 +283,7 @@ IntermediateVertex ConvexShape::makeIntermediateVertex(Point2D top, Point2D bott
 
 ConvexShape* ConvexShape::create(
     std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints,
-    FixedPointNumber z,
+    float z,
     Fill* fill) {
 
     ConvexShape* shape = create(leftPoints.size(), rightPoints.size(), fill);
@@ -304,7 +310,7 @@ ConvexShape* ConvexShape::create(
 }
 
 void ConvexShape::modifyPoints(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints,
-                               FixedPointNumber z) {
+                               float z) {
     if (leftPoints.size() < 2 || rightPoints.size() < 2)
         throw "too few points";
     if (leftPoints[0].y != rightPoints[0].y)
@@ -317,8 +323,8 @@ void ConvexShape::modifyPoints(std::vector<Point2D> leftPoints, std::vector<Poin
         throw "intermediate vertex count too large";
 
 
-    this->top = leftPoints.front().y.floor();
-    this->bottom = leftPoints.back().y.ceil();
+    this->top = (int) std::floor(leftPoints.front().y);
+    this->bottom = (int) std::ceil(leftPoints.back().y);
     this->z = z;
 
     if (top == bottom)
@@ -330,9 +336,9 @@ void ConvexShape::modifyPoints(std::vector<Point2D> leftPoints, std::vector<Poin
     this->topLeftX = leftPoints[0].x;
     this->topRightX = rightPoints[0].x;
     this->topLeftSlope = (leftPoints[1].x - leftPoints[0].x) /
-        (leftPoints[1].y.floor() - leftPoints[0].y.floor());
+        (std::floor(leftPoints[1].y) - std::floor(leftPoints[0].y));
     this->topRightSlope = (rightPoints[1].x - rightPoints[0].x) /
-        (rightPoints[1].y.floor() - rightPoints[0].y.floor());
+        (std::floor(rightPoints[1].y) - std::floor(rightPoints[0].y));
 
     for (int i = 1, j = 1, v = 0; ; ) {
         if (i < leftPoints.size() - 1) {

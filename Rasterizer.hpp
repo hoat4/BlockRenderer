@@ -1,6 +1,5 @@
 #pragma once
 
-#include "FixedPointNumber.hpp"
 #include <vector>
 #include "Fill.hpp"
 #include <memory>
@@ -8,8 +7,8 @@
 class Fill;
 
 struct Point2D {
-    FixedPointNumber x;
-    FixedPointNumber y;
+    float x;
+    float y;
 
     void operator +=(Point2D other) {
         x += other.x;
@@ -20,8 +19,8 @@ struct Point2D {
 struct IntermediateVertex {
     int y;
     bool isLeft;
-    FixedPointNumber x;
-    FixedPointNumber slope;
+    float x;
+    float slope;
 };
 
 class ConvexShape {
@@ -34,12 +33,12 @@ class ConvexShape {
      */
     int bottom;
 
-    FixedPointNumber topLeftX;
-    FixedPointNumber topRightX;
-    FixedPointNumber topLeftSlope;
-    FixedPointNumber topRightSlope;
+    float topLeftX;
+    float topRightX;
+    float topLeftSlope;
+    float topRightSlope;
 
-    FixedPointNumber z;
+    float z;
 
 public: // Fill.fillSpan miatt
     Fill* fill; // törölve lesz ~ConvexShape-ben
@@ -59,10 +58,10 @@ private:
      */
     int nextIntermediateVertexIndex;
 
-    FixedPointNumber leftX;
-    FixedPointNumber leftSlope;
-    FixedPointNumber rightX;
-    FixedPointNumber rightSlope;
+    float leftX;
+    float leftSlope;
+    float rightX;
+    float rightSlope;
 
     int minXFloor;
 
@@ -79,7 +78,7 @@ public:
      * valamint az utolsó pont y-ja is ugyanaz legyen mindkettő listában.
      */
     static ConvexShape* create(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints,
-                               FixedPointNumber z, Fill* fill);
+                               float z, Fill* fill);
 
     /**
      * Ezután a modifyPointsot meg kell hívni.
@@ -88,12 +87,12 @@ public:
                                Fill* fill);
 
     void modifyPoints(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints,
-                      FixedPointNumber z);
+                      float z);
 
     ~ConvexShape();
 
 private:
-    static FixedPointNumber slope(Point2D top, Point2D bottom);
+    static float slope(Point2D top, Point2D bottom);
     static IntermediateVertex makeIntermediateVertex(Point2D top, Point2D bottom, bool isLeft);
 };
 
@@ -130,5 +129,5 @@ private:
     void checkActiveShapes();
     void printActiveShapes();
     void renderSpans(uint16_t* buffer);
-    void fillSpan(uint16_t* buffer, FixedPointNumber from, FixedPointNumber to);
+    void fillSpan(uint16_t* buffer, float from, float to);
 };

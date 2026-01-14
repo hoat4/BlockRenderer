@@ -18,7 +18,7 @@ class Triangle {
 
         Triangle();
 
-        ConvexShape* toShape(FixedPointNumber z);
+        ConvexShape* toShape(float z);
 
     private:
         static uint32_t sqrt(uint32_t x);

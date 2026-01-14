@@ -59,17 +59,34 @@ Color ColorFill::blendColorsDstOpaque(Color dst, Color src) {
 
 void TextureFill::fillSpan(uint16_t* from, uint16_t* to,
                            std::vector<ConvexShape*>& shapeStack,
-                           int x, int y) {
-    FixedPointNumber u = uAtLeftTop + uByX * x + uByY * y;
-    FixedPointNumber v = vAtLeftTop + vByX * x + vByY * y;
+                           int x2, int y2) {
+    float x = x2 - baseX;
+    float y = y2 - baseY;
+
+    float zReciprocalValue = zReciprocal.valueAt(x, y);
+
+    float uPerZValue = uPerZ.valueAt(x, y);
+    float vPerZValue = vPerZ.valueAt(x, y);
+    
+        float z = 1 / zReciprocalValue;
+        float u = uPerZValue * z;
+        float v = vPerZValue * z;
+
+    //printf("(%f, %f): z: %f, u: %f, v: %f\n", x, y, z, u, v);
     //printf("v: %d,y:%d\n", v.floor(), y);
 
     while (from != to) {
-        int textureX = u.floor();
-        int textureY = v.floor();
+        float z = 1 / zReciprocalValue;
+        float u = uPerZValue * z;
+        float v = vPerZValue * z;
 
-        u += uByX;
-        v += vByX;
+
+        int textureX = (int) u;
+        int textureY = (int) v;
+
+        zReciprocalValue += zReciprocal.byX;
+        uPerZValue += uPerZ.byX;
+        vPerZValue += vPerZ.byX;
 
         if (textureX < 0)
             textureX = 0;
