@@ -67,37 +67,55 @@ void TextureFill::fillSpan(uint16_t* from, uint16_t* to,
 
     float uPerZValue = uPerZ.valueAt(x, y);
     float vPerZValue = vPerZ.valueAt(x, y);
-    
-        float z = 1 / zReciprocalValue;
-        float u = uPerZValue * z;
-        float v = vPerZValue * z;
+
+    float z = 1 / zReciprocalValue;
+    float u = uPerZValue * z;
+    float v = vPerZValue * z;
 
     //printf("(%f, %f): z: %f, u: %f, v: %f\n", x, y, z, u, v);
     //printf("v: %d,y:%d\n", v.floor(), y);
 
     while (from != to) {
-        float z = 1 / zReciprocalValue;
-        float u = uPerZValue * z;
-        float v = vPerZValue * z;
+        zReciprocalValue += zReciprocal.by8X;
+        uPerZValue += uPerZ.by8X;
+        vPerZValue += vPerZ.by8X;
 
+        float zNext = 1 / zReciprocalValue;
+        float uNext = uPerZValue * z;
+        float vNext = vPerZValue * z;
 
-        int textureX = (int) u;
-        int textureY = (int) v;
+        // ld. "Scanline subdivision" itt: 
+        // https://www.lysator.liu.se/~mikaelk/doc/perspectivetexture/
+        
+        int uIncrement = (int)((uNext - u) * (65536 / 8));
+        int vIncrement = (int)((vNext - v) * (65536 / 8));
 
-        zReciprocalValue += zReciprocal.byX;
-        uPerZValue += uPerZ.byX;
-        vPerZValue += vPerZ.byX;
+        int textureXFixedPoint = (int)(u * 65536);
+        int textureYFixedPoint = (int)(v * 65536);
 
-        if (textureX < 0)
-            textureX = 0;
-        if (textureY < 0)
-            textureY = 0;
-        if (textureX > 15)
-            textureX = 15;
-        if (textureY > 15)
-            textureY = 15;
+        for (int i = 0; i < 8; i++) {
+            if (textureXFixedPoint < 0)
+                textureXFixedPoint = 0;
+            if (textureYFixedPoint < 0)
+                textureYFixedPoint = 0;
+            if (textureXFixedPoint > 15 * 65536)
+                textureXFixedPoint = 15 * 65536;
+            if (textureYFixedPoint > 15 * 65536)
+                textureYFixedPoint = 15 * 65536;
+            *(from++) = texture[(textureXFixedPoint >> 16) + (textureYFixedPoint >> 16) * 16];
+            //*(from++) = texture[20];
 
-        *(from++) = texture[textureX + textureY * 16];
+            if (i != 7) {
+                textureXFixedPoint += uIncrement;
+                textureYFixedPoint += vIncrement;
+                if (from == to)
+                    return;
+            }
+        }
+
+        z = zNext;
+        u = uNext;
+        v = vNext;
     }
 }
 

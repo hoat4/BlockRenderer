@@ -29,6 +29,8 @@ int main() {
         LineBuffer lineBuffer = display.nextLine();
         game.renderLine(lineBuffer.lineNumber, lineBuffer.buffer);
 
+        // TODO enélkül most valamiért szétesik ("DVI output stalled")
+        //if (lineBuffer.lineNumber == 0)
         //printf("%d\n", lineBuffer.lineNumber);
         //sleep_ms(10);
     }

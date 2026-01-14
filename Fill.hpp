@@ -41,6 +41,7 @@ struct LerpableData {
      */
     float base;
     float byX;
+    float by8X;
     float byY;
 
     float valueAt(float x, float y) {

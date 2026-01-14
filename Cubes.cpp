@@ -5,14 +5,12 @@
 #include "math.h"
 
 Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
-    addCube(Point3DInt(1, -2, 5), GRASS);
-    addCube(Point3DInt(-2, -2, 5), DIRT);
-    /*
-    addCube(Point3DInt(-1, -2, 5), DIRT);
-    addCube(Point3DInt(-2, -2, 6), DIRT);
-    addCube(Point3DInt(-2, -2, 7), DIRT);
-    */
-    //    addCube(Point3DInt(-1, -2, 7), DIRT);
+    addCube(Point3DInt(1, -2, 4), GRASS);
+    addCube(Point3DInt(-2, -2, 4), DIRT);
+    //addCube(Point3DInt(-1, -2, 4), DIRT);
+    //addCube(Point3DInt(-2, -2, 5), DIRT);
+    //addCube(Point3DInt(-2, -2, 6), DIRT);
+    //    addCube(Point3DInt(-1, -2, 6), DIRT);
 
     frameID = 0;
 }
@@ -207,31 +205,36 @@ void Cubes::computeZUVMatrix(Cube& cube, CubeFace face, TextureFill& textureFill
     // "1/z, u/z and v/z are linear in screen space": 
     // https://www.lysator.liu.se/~mikaelk/doc/perspectivetexture/
 
+    int pixelStepRight = 8;
+
     textureFill.baseX = p.x;
     textureFill.baseY = p.y;
     ZUV origin = computeZUV(cube, face, textureFill.baseX, textureFill.baseY);
-    ZUV right = computeZUV(cube, face, textureFill.baseX + 1, textureFill.baseY);
+    ZUV right = computeZUV(cube, face, textureFill.baseX + pixelStepRight, textureFill.baseY);
     ZUV down = computeZUV(cube, face, textureFill.baseX, textureFill.baseY + 1);
 
     if (face == FACE_SOUTH&&false) {
         printf("\n");
         printf("base: %f, %f\n", p.x, p.y);
         printf("(0, 0): z: %f, u: %f, v: %f\n", 1/origin.zReciprocal, origin.uPerZ/origin.zReciprocal, origin.vPerZ/origin.zReciprocal);
-        printf("(1, 0): z: %f, u: %f, v: %f\n", 1/right.zReciprocal, right.uPerZ/right.zReciprocal, right.vPerZ/right.zReciprocal);
+        printf("(%d, 0): z: %f, u: %f, v: %f\n", pixelStepRight, 1/right.zReciprocal, right.uPerZ/right.zReciprocal, right.vPerZ/right.zReciprocal);
         printf("(0, 1): z: %f, u: %f, v: %f\n", 1/down.zReciprocal, down.uPerZ/down.zReciprocal, down.vPerZ/down.zReciprocal);
         printf("\n");
     }
 
     textureFill.zReciprocal.base = origin.zReciprocal;
-    textureFill.zReciprocal.byX = right.zReciprocal - origin.zReciprocal;
+    textureFill.zReciprocal.by8X = right.zReciprocal - origin.zReciprocal;
+    textureFill.zReciprocal.byX = textureFill.zReciprocal.by8X * (1.0f / pixelStepRight);
     textureFill.zReciprocal.byY = down.zReciprocal - origin.zReciprocal;
 
     textureFill.uPerZ.base = origin.uPerZ;
-    textureFill.uPerZ.byX = right.uPerZ - origin.uPerZ;
+    textureFill.uPerZ.by8X = right.uPerZ - origin.uPerZ;
+    textureFill.uPerZ.byX = textureFill.uPerZ.by8X * (1.0f / pixelStepRight);
     textureFill.uPerZ.byY = down.uPerZ - origin.uPerZ;
 
     textureFill.vPerZ.base = origin.vPerZ;
-    textureFill.vPerZ.byX = right.vPerZ - origin.vPerZ;
+    textureFill.vPerZ.by8X = right.vPerZ - origin.vPerZ;
+    textureFill.vPerZ.byX = textureFill.vPerZ.by8X * (1.0f / pixelStepRight);
     textureFill.vPerZ.byY = down.vPerZ - origin.vPerZ;
 }
 
