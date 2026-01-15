@@ -50,7 +50,7 @@ pico_enable_stdio_usb(BlockRenderer 0)
 
 # Add the standard library to the build
 target_link_libraries(BlockRenderer
-        pico_stdlib hardware_dma pico_rand)
+        pico_stdlib hardware_dma hardware_interp pico_rand)
 
 # Add the standard include files to the build
 target_include_directories(BlockRenderer PRIVATE

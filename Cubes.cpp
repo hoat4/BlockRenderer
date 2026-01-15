@@ -6,10 +6,12 @@
 
 Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
     //addCube(Point3DInt(2, 0, 3), GRASS);
+    
     addCube(Point3DInt(1, -2, 4), GRASS);
+
     addCube(Point3DInt(-2, -2, 4), DIRT);
     addCube(Point3DInt(-1, -2, 4), DIRT);
-    addCube(Point3DInt(-2, -2, 5), DIRT);
+    //addCube(Point3DInt(-2, -2, 5), DIRT);
     //addCube(Point3DInt(-2, -2, 6), DIRT);
     //    addCube(Point3DInt(-1, -2, 6), DIRT);
 

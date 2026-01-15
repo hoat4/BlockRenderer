@@ -199,6 +199,8 @@ void Rasterizer::renderSpans(uint16_t* buffer) {
         printActiveShapes();
     }
 
+    TextureFill::initInterpolator();
+
     float prevX = 0;
     ConvexShape* nextLeft = activeShapes;
     while (true) {

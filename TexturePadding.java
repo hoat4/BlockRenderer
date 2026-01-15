@@ -34,6 +34,9 @@ void processFile(String filename, String variableName) throws Throwable {
             RGB color = at(srcCol, srcRow);
             out.append(String.format("0x%04x, ", color.toRGB565()));
         }
+        for (int col = 18; col < 32; col++) {
+            out.append("0, ");
+        }
         out.append("\n");
     }
     out.append("};\n");
