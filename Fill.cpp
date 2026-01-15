@@ -57,9 +57,18 @@ Color ColorFill::blendColorsDstOpaque(Color dst, Color src) {
     return 0xFF000000 | (ro & 0xFF00) << 8 | (go & 0xFF00) | bo >> 8;
 }
 
+void TextureFill::initInterpolator() {
+
+}
+
 void TextureFill::fillSpan(uint16_t* from, uint16_t* to,
                            std::vector<ConvexShape*>& shapeStack,
                            int x2, int y2) {
+
+    const int TEXTURE_SIZE = 18;
+    const int SCANLINE_SUBDIVISION = 8;
+    const int UV_FRACTIONAL_BITS = 16;
+
     float x = x2 - baseX;
     float y = y2 - baseY;
 
@@ -72,6 +81,32 @@ void TextureFill::fillSpan(uint16_t* from, uint16_t* to,
     float u = uPerZValue * z;
     float v = vPerZValue * z;
 
+    if (u < 0 || u >= TEXTURE_SIZE || v < 0 || v >= TEXTURE_SIZE) {
+        throw "texture coordinates out of bounds (1)";
+    }
+
+    int advance = to - from;
+    /*
+    printf("advance: %d\n", advance);
+    printf("1/z: %f, u/z: %f, v/z: %f\n", zReciprocalValue, uPerZValue, vPerZValue);
+    printf("new 1/z: %f, u/z: %f, v/z: %f\n", zReciprocalValue + advance * zReciprocal.byX, uPerZValue + advance * uPerZ.byX, vPerZValue + advance * vPerZ.byX);
+    */
+    float zEnd = 1 / (zReciprocalValue + advance * zReciprocal.byX);
+    float uEnd = (uPerZValue + advance * uPerZ.byX) * zEnd;
+    float vEnd = (vPerZValue + advance * vPerZ.byX) * zEnd;
+    /*
+    printf("at %d, %d draw %d ", x2, y2, to - from);
+    printf("u: %f, v: %f, z: %f, uEnd: %f, vEnd: %f, zEnd: %f\n", u, v, z, uEnd, vEnd, zEnd);
+    */
+    if (uEnd < 0 || uEnd >= TEXTURE_SIZE || vEnd < 0 || vEnd >= TEXTURE_SIZE) {
+        /*
+        while (from != to)
+            *(from++) = 0xF000;
+        return;
+        */
+        throw "texture coordinates out of bounds (2)";
+    }
+
     //printf("(%f, %f): z: %f, u: %f, v: %f\n", x, y, z, u, v);
     //printf("v: %d,y:%d\n", v.floor(), y);
 
@@ -81,31 +116,23 @@ void TextureFill::fillSpan(uint16_t* from, uint16_t* to,
         vPerZValue += vPerZ.by8X;
 
         float zNext = 1 / zReciprocalValue;
-        float uNext = uPerZValue * z;
-        float vNext = vPerZValue * z;
+        float uNext = uPerZValue * zNext;
+        float vNext = vPerZValue * zNext;
 
         // ld. "Scanline subdivision" itt: 
         // https://www.lysator.liu.se/~mikaelk/doc/perspectivetexture/
-        
-        int uIncrement = (int)((uNext - u) * (65536 / 8));
-        int vIncrement = (int)((vNext - v) * (65536 / 8));
 
-        int textureXFixedPoint = (int)(u * 65536);
-        int textureYFixedPoint = (int)(v * 65536);
+        int uIncrement = (int)((uNext - u) * ((1 << UV_FRACTIONAL_BITS) / SCANLINE_SUBDIVISION));
+        int vIncrement = (int)((vNext - v) * ((1 << UV_FRACTIONAL_BITS) / SCANLINE_SUBDIVISION));
 
-        for (int i = 0; i < 8; i++) {
-            if (textureXFixedPoint < 0)
-                textureXFixedPoint = 0;
-            if (textureYFixedPoint < 0)
-                textureYFixedPoint = 0;
-            if (textureXFixedPoint > 15 * 65536)
-                textureXFixedPoint = 15 * 65536;
-            if (textureYFixedPoint > 15 * 65536)
-                textureYFixedPoint = 15 * 65536;
-            *(from++) = texture[(textureXFixedPoint >> 16) + (textureYFixedPoint >> 16) * 16];
-            //*(from++) = texture[20];
+        int textureXFixedPoint = (int)(u * (1 << UV_FRACTIONAL_BITS));
+        int textureYFixedPoint = (int)(v * (1 << UV_FRACTIONAL_BITS));
 
-            if (i != 7) {
+        for (int i = 0; i < SCANLINE_SUBDIVISION; i++) {
+            *(from++) = texture[(textureXFixedPoint >> UV_FRACTIONAL_BITS) +
+                (textureYFixedPoint >> UV_FRACTIONAL_BITS) * TEXTURE_SIZE];
+            
+            if (i != (SCANLINE_SUBDIVISION - 1)) {
                 textureXFixedPoint += uIncrement;
                 textureYFixedPoint += vIncrement;
                 if (from == to)

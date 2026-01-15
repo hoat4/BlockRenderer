@@ -64,6 +64,8 @@ public:
 
     TextureFill() {}
 
+    static void initInterpolator();
+
     virtual bool isOpaque();
     virtual void fillSpan(uint16_t* from, uint16_t* to,
                           std::vector<ConvexShape*>& shapeStack,

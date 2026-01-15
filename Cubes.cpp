@@ -5,10 +5,11 @@
 #include "math.h"
 
 Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
+    //addCube(Point3DInt(2, 0, 3), GRASS);
     addCube(Point3DInt(1, -2, 4), GRASS);
     addCube(Point3DInt(-2, -2, 4), DIRT);
-    //addCube(Point3DInt(-1, -2, 4), DIRT);
-    //addCube(Point3DInt(-2, -2, 5), DIRT);
+    addCube(Point3DInt(-1, -2, 4), DIRT);
+    addCube(Point3DInt(-2, -2, 5), DIRT);
     //addCube(Point3DInt(-2, -2, 6), DIRT);
     //    addCube(Point3DInt(-1, -2, 6), DIRT);
 
@@ -26,16 +27,16 @@ void Cubes::addCube(Point3DInt p, CubeType type) {
 void Cubes::update() {
     if (frameID == 0) {
         printf("create bg\n");
-        aspectRatio = (float) rasterizer->screenWidth() / (float) rasterizer->screenHeight();
+        aspectRatio = (float)rasterizer->screenWidth() / (float)rasterizer->screenHeight();
 
         ConvexShape* background = ConvexShape::create(
             {
                 { x: 0.0f, y : 0.0f },
-                { x: 0.0f, y : (float) rasterizer->screenHeight() }
+                { x: 0.0f, y : (float)rasterizer->screenHeight() }
             },
             {
-                { x: (float) rasterizer->screenWidth(), y : 0.0f },
-                { x: (float) rasterizer->screenWidth(), y : (float) rasterizer->screenHeight() },
+                { x: (float)rasterizer->screenWidth(), y : 0.0f },
+                { x: (float)rasterizer->screenWidth(), y : (float)rasterizer->screenHeight() },
             },
             -std::numeric_limits<float>::infinity(),
             new ColorFill(0xFF55EEFF)
@@ -100,8 +101,8 @@ void Cubes::update() {
             rasterizer->shapes.push_back(faceShape);
             Point2D point = projectCubeFace(cube, (CubeFace)face);
             computeZUVMatrix(cube, (CubeFace)face,
-                             *reinterpret_cast<TextureFill*>(faceShape->fill), 
-                            point);
+                             *reinterpret_cast<TextureFill*>(faceShape->fill),
+                             point);
         }
     }
 
@@ -143,6 +144,16 @@ Point2D Cubes::projectCubeFace(Cube& cube, CubeFace face) {
     points.push_back(projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 1]));
     points.push_back(projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 2]));
     points.push_back(projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 3]));
+
+    /*
+    for (Point2D p : points) {
+        ZUV zuv = computeZUV(cube, face, p.x, p.y);
+        printf("Face %d, point (%f, %f): z=%f, u=%f, v=%f\n", face, p.x, p.y, 1.0f / zuv.zReciprocal, zuv.uPerZ / zuv.zReciprocal, zuv.vPerZ / zuv.zReciprocal);
+    }
+    Point2D p = { .x = 399, .y = 319 };
+    ZUV zuv = computeZUV(cube, face, p.x, p.y);
+    printf("Face %d, point (%f, %f): z=%f, u=%f, v=%f\n", face, p.x, p.y, 1.0f / zuv.zReciprocal, zuv.uPerZ / zuv.zReciprocal, zuv.vPerZ / zuv.zReciprocal);
+    */
 
     std::sort(points.begin(), points.end(), [](Point2D a, Point2D b) {
         return a.y == b.y ? a.x < b.x : a.y < b.y;});
@@ -213,12 +224,12 @@ void Cubes::computeZUVMatrix(Cube& cube, CubeFace face, TextureFill& textureFill
     ZUV right = computeZUV(cube, face, textureFill.baseX + pixelStepRight, textureFill.baseY);
     ZUV down = computeZUV(cube, face, textureFill.baseX, textureFill.baseY + 1);
 
-    if (face == FACE_SOUTH&&false) {
+    if (face == FACE_SOUTH && false) {
         printf("\n");
         printf("base: %f, %f\n", p.x, p.y);
-        printf("(0, 0): z: %f, u: %f, v: %f\n", 1/origin.zReciprocal, origin.uPerZ/origin.zReciprocal, origin.vPerZ/origin.zReciprocal);
-        printf("(%d, 0): z: %f, u: %f, v: %f\n", pixelStepRight, 1/right.zReciprocal, right.uPerZ/right.zReciprocal, right.vPerZ/right.zReciprocal);
-        printf("(0, 1): z: %f, u: %f, v: %f\n", 1/down.zReciprocal, down.uPerZ/down.zReciprocal, down.vPerZ/down.zReciprocal);
+        printf("(0, 0): z: %f, u: %f, v: %f\n", 1 / origin.zReciprocal, origin.uPerZ / origin.zReciprocal, origin.vPerZ / origin.zReciprocal);
+        printf("(%d, 0): z: %f, u: %f, v: %f\n", pixelStepRight, 1 / right.zReciprocal, right.uPerZ / right.zReciprocal, right.vPerZ / right.zReciprocal);
+        printf("(0, 1): z: %f, u: %f, v: %f\n", 1 / down.zReciprocal, down.uPerZ / down.zReciprocal, down.vPerZ / down.zReciprocal);
         printf("\n");
     }
 
@@ -236,6 +247,20 @@ void Cubes::computeZUVMatrix(Cube& cube, CubeFace face, TextureFill& textureFill
     textureFill.vPerZ.by8X = right.vPerZ - origin.vPerZ;
     textureFill.vPerZ.byX = textureFill.vPerZ.by8X * (1.0f / pixelStepRight);
     textureFill.vPerZ.byY = down.vPerZ - origin.vPerZ;
+
+    /*
+    Point2D p2 = { .x = 384, .y = 319 };
+    float zReciprocal = textureFill.zReciprocal.valueAt(p2.x - p.x, p2.y - p.y);
+    float uPerZ = textureFill.uPerZ.valueAt(p2.x - p.x, p2.y - p.y);
+    float vPerZ = textureFill.vPerZ.valueAt(p2.x - p.x, p2.y - p.y);
+    printf("Face %d, point (384, %f) with matrix: z=%f, u=%f, v=%f\n", face, p2.y, 1.0f / zReciprocal, uPerZ / zReciprocal, vPerZ / zReciprocal);
+    printf("1/z: %f, u/z: %f, v/z: %f\n", zReciprocal, uPerZ, vPerZ);
+    zReciprocal += textureFill.zReciprocal.byX * 15;
+    uPerZ += textureFill.uPerZ.byX * 15;
+    vPerZ += textureFill.vPerZ.byX * 15;
+    printf("1/z: %f, u/z: %f, v/z: %f\n", zReciprocal, uPerZ, vPerZ);
+    printf("Face %d, point (384+15, %f) with matrix: z=%f, u=%f, v=%f\n", face, p2.y, 1.0f / zReciprocal, uPerZ / zReciprocal, vPerZ / zReciprocal);
+    */
 }
 
 ZUV Cubes::computeZUV(Cube& cube, CubeFace face, float x, float y) {
@@ -278,8 +303,8 @@ ZUV Cubes::computeZUV(Cube& cube, CubeFace face, float x, float y) {
         break;
     }
 
-    u *= 15;
-    v *= 15;
+    u = u * 16 + 1;
+    v = v * 16 + 1;
 
     return {
         .zReciprocal = 1 / z,
