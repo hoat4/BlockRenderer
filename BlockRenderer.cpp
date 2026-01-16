@@ -6,12 +6,6 @@
 #include "TriangleDemo.hpp"
 #include "Cubes.hpp"
 
-void vacak() {
-    gpio_init(PICO_DEFAULT_LED_PIN);
-    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
-    gpio_put(PICO_DEFAULT_LED_PIN, 1);
-}
-
 int main() {
     DVIDisplay::initSystemClocks();
     stdio_init_all();
@@ -23,48 +17,58 @@ int main() {
 
     DVIDisplay display(pinout);
 
-    Game game(display.width(), display.height());
+    Rasterizer rasterizer(display.width(), display.height());
+    Scene* scene = new Cubes();
+    scene->rasterizer = &rasterizer;
+
+    // induláskor érvénytelen értékre állítjuk, hogy első frameet új framenek
+    // érzékelje
+    int expectedY = display.height();
 
     while (true) {
         LineBuffer lineBuffer = display.nextLine();
-        game.renderLine(lineBuffer.lineNumber, lineBuffer.buffer);
+        int y = lineBuffer.lineNumber;
+        //printf("%d\n", y);
+
+        if (y < expectedY) {
+            // new frame
+
+            scene->update();
+            rasterizer.beginFrame();
+            if (y != 0)
+                rasterizer.skipLines(y);
+        } else if (y > expectedY) {
+            rasterizer.skipLines(y - expectedY);
+        }
+        expectedY = y + 1;
+
+        //if (y%10 == 0)
+        //    printf("R%d\n", y);
+        try {
+            absolute_time_t t1 = get_absolute_time();
+            rasterizer.prepareLine();
+            absolute_time_t t2 = get_absolute_time();
+            rasterizer.renderLine(lineBuffer.buffer);
+            absolute_time_t t3 = get_absolute_time();
+            if (absolute_time_diff_us(t1, t3) >= 30&&false)
+                printf("Rendering row %d took %lld microseconds (prepare %lld, render %lld)\n",
+                       y,
+                       absolute_time_diff_us(t1, t3),
+                       absolute_time_diff_us(t1, t2),
+                       absolute_time_diff_us(t2, t3));
+        } catch (const char* msg) {
+            panic("failed to render line %d: %s\n", y, msg);
+        }
+        /*
+        for (int i = 0; i < 640; i++)
+        lineBuffer.buffer[i] = 24533;
+        */
+
+        lineBuffer.doneWriting();
 
         // TODO enélkül most valamiért szétesik ("DVI output stalled")
         //if (lineBuffer.lineNumber == 0)
         //printf("%d\n", lineBuffer.lineNumber);
         //sleep_ms(10);
-    }
-}
-
-Game::Game(int width, int height) :
-    width(width), height(height), rasterizer(Rasterizer(width, height)) {
-
-    // induláskor érvénytelen értékre állítjuk, hogy első frameet új framenek
-    // érzékelje
-    expectedY = height;
-
-    scene = new Cubes();
-    scene->rasterizer = &rasterizer;
-}
-
-void Game::renderLine(int y, uint16_t* buffer) {
-    if (y < expectedY) {
-        // new frame
-
-        scene->update();
-        rasterizer.beginFrame();
-        if (y != 0)
-            rasterizer.skipLines(y);
-    } else if (y > expectedY) {
-        rasterizer.skipLines(y - expectedY);
-    }
-    expectedY = y + 1;
-
-    //if (y%10 == 0)
-    //    printf("R%d\n", y);
-    try {
-        rasterizer.renderLine(buffer);
-    } catch (const char* msg) {
-        panic("failed to render line %d: %s\n", y, msg);
     }
 }

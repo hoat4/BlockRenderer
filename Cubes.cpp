@@ -6,12 +6,17 @@
 
 Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
     //addCube(Point3DInt(2, 0, 3), GRASS);
-    
     addCube(Point3DInt(1, -2, 4), GRASS);
-
     addCube(Point3DInt(-2, -2, 4), DIRT);
     addCube(Point3DInt(-1, -2, 4), DIRT);
-    //addCube(Point3DInt(-2, -2, 5), DIRT);
+    addCube(Point3DInt(-3, -2, 4), DIRT);
+    addCube(Point3DInt(-4, -2, 4), DIRT);
+    //    addCube(Point3DInt(-2, -2, 5), DIRT);
+    //    addCube(Point3DInt(-2, 2, 4), DIRT);
+    addCube(Point3DInt(-2, 1, 4), DIRT);
+    addCube(Point3DInt(-2, 0, 4), DIRT);
+    addCube(Point3DInt(-2, 1, 4), DIRT);
+    addCube(Point3DInt(-2, -1, 4), DIRT);
     //addCube(Point3DInt(-2, -2, 6), DIRT);
     //    addCube(Point3DInt(-1, -2, 6), DIRT);
 
@@ -31,18 +36,19 @@ void Cubes::update() {
         printf("create bg\n");
         aspectRatio = (float)rasterizer->screenWidth() / (float)rasterizer->screenHeight();
 
+        std::array<Point2D, 2> leftPoints = { {
+            { x: 0.0f, y : 0.0f },
+            { x: 0.0f, y : (float)rasterizer->screenHeight() }
+        } };
+        std::array<Point2D, 2> rightPoints = { {
+            { x: (float)rasterizer->screenWidth(), y : 0.0f },
+            { x: (float)rasterizer->screenWidth(), y : (float)rasterizer->screenHeight() },
+        } };
         ConvexShape* background = ConvexShape::create(
-            {
-                { x: 0.0f, y : 0.0f },
-                { x: 0.0f, y : (float)rasterizer->screenHeight() }
-            },
-            {
-                { x: (float)rasterizer->screenWidth(), y : 0.0f },
-                { x: (float)rasterizer->screenWidth(), y : (float)rasterizer->screenHeight() },
-            },
+            leftPoints, rightPoints,
             -std::numeric_limits<float>::infinity(),
             new ColorFill(0xFF55EEFF)
-            );
+        );
         rasterizer->shapes.push_back(background);
     }
 
@@ -137,15 +143,15 @@ Point3DInt CUBE_VERTEX_OFFSETS[] = {
 Point2D Cubes::projectCubeFace(Cube& cube, CubeFace face) {
     // kamera pozíció és forgás alapján eliminálni lehetne a sortot
 
-    std::vector<Point2D> points;
+    Point2D points[4] = {
+        projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4]),
+        projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 1]),
+        projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 2]),
+        projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 3])
+    };
 
     //printf("uAtLeftTop:%d, uByX: %d\n",
     //       textureFill.uAtLeftTop.floor(), textureFill.uByX.floor());           
-
-    points.push_back(projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4]));
-    points.push_back(projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 1]));
-    points.push_back(projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 2]));
-    points.push_back(projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 3]));
 
     /*
     for (Point2D p : points) {
@@ -157,7 +163,7 @@ Point2D Cubes::projectCubeFace(Cube& cube, CubeFace face) {
     printf("Face %d, point (%f, %f): z=%f, u=%f, v=%f\n", face, p.x, p.y, 1.0f / zuv.zReciprocal, zuv.uPerZ / zuv.zReciprocal, zuv.vPerZ / zuv.zReciprocal);
     */
 
-    std::sort(points.begin(), points.end(), [](Point2D a, Point2D b) {
+    std::sort(std::begin(points), std::end(points), [](Point2D a, Point2D b) {
         return a.y == b.y ? a.x < b.x : a.y < b.y;});
 
     /*
@@ -170,25 +176,26 @@ printf("projected points: %d,%d; %d,%d; %d,%d; %d,%d\n",
 */
 
 
-    std::vector<Point2D> leftPoints, rightPoints;
+    std::array<Point2D, 4> leftPoints, rightPoints;
 
     float diagonalSlope = (points[3].x - points[0].x) / std::floor(points[3].y - points[0].y);
 
-    leftPoints.push_back(points[0]);
-    rightPoints.push_back(points[0]);
+    leftPoints[0] = points[0];
+    rightPoints[0] = points[0];
+    int leftPointCount = 1, rightPointCount = 1;
 
     if (points[1].x < points[0].x + diagonalSlope * std::floor(points[1].y - points[0].y))
-        leftPoints.push_back(points[1]);
+        leftPoints[leftPointCount++] = points[1];
     else
-        rightPoints.push_back(points[1]);
+        rightPoints[rightPointCount++] = points[1];
 
     if (points[2].x < points[0].x + diagonalSlope * std::floor(points[2].y - points[0].y))
-        leftPoints.push_back(points[2]);
+        leftPoints[leftPointCount++] = points[2];
     else
-        rightPoints.push_back(points[2]);
+        rightPoints[rightPointCount++] = points[2];
 
-    leftPoints.push_back(points[3]);
-    rightPoints.push_back(points[3]);
+    leftPoints[leftPointCount++] = points[3];
+    rightPoints[rightPointCount++] = points[3];
 
     Point3D cubeCenter(
         cube.pos.x + 0.5f,
@@ -197,7 +204,11 @@ printf("projected points: %d,%d; %d,%d; %d,%d; %d,%d\n",
     );
     float zIndex = Point3D::distanceSq(cubeCenter, cameraPos);
 
-    cube.cachedShapes[face]->modifyPoints(leftPoints, rightPoints, -zIndex);
+    cube.cachedShapes[face]->modifyPoints(
+        std::span{leftPoints}.subspan(0, leftPointCount), 
+        std::span{rightPoints}.subspan(0, rightPointCount), 
+        -zIndex
+    );
 
     return leftPoints[0];
 }
@@ -307,6 +318,9 @@ ZUV Cubes::computeZUV(Cube& cube, CubeFace face, float x, float y) {
 
     u = u * 16 + 1;
     v = v * 16 + 1;
+
+    u *= 1 << TextureFill::UV_FRACTIONAL_BITS;
+    v *= 1 << TextureFill::UV_FRACTIONAL_BITS;
 
     return {
         .zReciprocal = 1 / z,

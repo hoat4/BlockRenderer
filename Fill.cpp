@@ -2,9 +2,28 @@
 
 #include <iomanip>
 #include "hardware/interp.h"
+#include "hardware/dma.h"
 
 bool ColorFill::isOpaque() {
     return (color & 0xFF000000) == 0xFF000000;
+}
+
+int dmaChannel;
+dma_channel_config dmaChannelConfig;
+int dmaBuffer;
+
+void ColorFill::initDMAChannel() {
+    // Get a free channel, panic() if there are none
+    dmaChannel = dma_claim_unused_channel(true);
+
+    dmaChannelConfig = dma_channel_get_default_config(dmaChannel);
+    channel_config_set_transfer_data_size(&dmaChannelConfig, DMA_SIZE_32);
+    channel_config_set_read_increment(&dmaChannelConfig, false);
+    channel_config_set_write_increment(&dmaChannelConfig, true);
+}
+
+void ColorFill::waitForDMAChannelToFinish() {
+    dma_channel_wait_for_finish_blocking(dmaChannel);
 }
 
 void ColorFill::fillSpan(uint16_t* from, uint16_t* to,
@@ -28,8 +47,25 @@ void ColorFill::fillSpan(uint16_t* from, uint16_t* to,
 
     uint16_t rgb565 = ((r & 0b11111000) << 8) | ((g & 0b11111100) << 3) | ((b & 0b11111000) >> 3);
 
-    while (from != to)
+    if ((intptr_t)from & 2)
         *(from++) = rgb565;
+    if (((intptr_t)to) & ~2)
+        *(to - 1) = rgb565;
+
+    uint32_t colorDoubled = rgb565 | rgb565 << 16;
+    uint32_t* start2 = (uint32_t*)from;
+    uint32_t* end2 = (uint32_t*)to;
+
+    dma_channel_wait_for_finish_blocking(dmaChannel);
+    dmaBuffer = colorDoubled;
+    dma_channel_configure(
+        dmaChannel,
+        &dmaChannelConfig,
+        from,   // The initial write address
+        &dmaBuffer,     // The initial read address
+        end2 - ((uint32_t*)from),      // Number of transfers
+        true            // Start immediately.
+    );
 }
 
 std::string ColorFill::toString() {
@@ -61,8 +97,8 @@ Color ColorFill::blendColorsDstOpaque(Color dst, Color src) {
 const int TEXTURE_STRIDE_BITS = 5;
 const int TEXTURE_SIZE = 18;
 const int MAX_TEXTURE_ROW_BITS = 5;
-const int SCANLINE_SUBDIVISION = 8;
-const int UV_FRACTIONAL_BITS = 16;
+const int SCANLINE_SUBDIVISION_BITS = 3;
+const int SCANLINE_SUBDIVISION = 1 << SCANLINE_SUBDIVISION_BITS;
 
 void TextureFill::initInterpolator() {
     interp_config cfg = interp_default_config();
@@ -82,6 +118,7 @@ void TextureFill::fillSpan(uint16_t* from, uint16_t* to,
                            std::vector<ConvexShape*>& shapeStack,
                            int x2, int y2) {
 
+
     float x = x2 - baseX;
     float y = y2 - baseY;
 
@@ -91,93 +128,68 @@ void TextureFill::fillSpan(uint16_t* from, uint16_t* to,
     float vPerZValue = vPerZ.valueAt(x, y);
 
     float z = 1 / zReciprocalValue;
-    float u = uPerZValue * z;
-    float v = vPerZValue * z;
+    int u = (int)(uPerZValue * z);
+    int v = (int)(vPerZValue * z);
 
-    if (u < 0 || u >= TEXTURE_SIZE || v < 0 || v >= TEXTURE_SIZE) {
+    if (u < 0 || u >= TEXTURE_SIZE << UV_FRACTIONAL_BITS || v < 0 || v >= TEXTURE_SIZE << UV_FRACTIONAL_BITS) {
         throw "texture coordinates out of bounds (1)";
     }
 
-    int advance = to - from;
     /*
-    printf("advance: %d\n", advance);
-    printf("1/z: %f, u/z: %f, v/z: %f\n", zReciprocalValue, uPerZValue, vPerZValue);
-    printf("new 1/z: %f, u/z: %f, v/z: %f\n", zReciprocalValue + advance * zReciprocal.byX, uPerZValue + advance * uPerZ.byX, vPerZValue + advance * vPerZ.byX);
-    */
+    int advance = to - from;
     float zEnd = 1 / (zReciprocalValue + advance * zReciprocal.byX);
     float uEnd = (uPerZValue + advance * uPerZ.byX) * zEnd;
     float vEnd = (vPerZValue + advance * vPerZ.byX) * zEnd;
-    /*
-    printf("at %d, %d draw %d ", x2, y2, to - from);
-    printf("u: %f, v: %f, z: %f, uEnd: %f, vEnd: %f, zEnd: %f\n", u, v, z, uEnd, vEnd, zEnd);
-    */
     if (uEnd < 0 || uEnd >= TEXTURE_SIZE || vEnd < 0 || vEnd >= TEXTURE_SIZE) {
         /*
         while (from != to)
             *(from++) = 0xF000;
         return;
-        */
+        *
         throw "texture coordinates out of bounds (2)";
     }
+        */
 
-    //printf("(%f, %f): z: %f, u: %f, v: %f\n", x, y, z, u, v);
-    //printf("v: %d,y:%d\n", v.floor(), y);
+        //printf("(%f, %f): z: %f, u: %f, v: %f\n", x, y, z, u, v);
+        //printf("v: %d,y:%d\n", v.floor(), y);
 
     interp0->base[2] = (uintptr_t)texture;
+    interp0->accum[0] = u;
+    interp0->accum[1] = v;
 
-    while (from != to) {
-        zReciprocalValue += zReciprocal.by8X;
+    zReciprocalValue += zReciprocal.by8X;
+    float zNext = 1.0f / zReciprocalValue;
+
+    while (from < to) {
         uPerZValue += uPerZ.by8X;
         vPerZValue += vPerZ.by8X;
 
-        float zNext = 1 / zReciprocalValue;
-        float uNext = uPerZValue * zNext;
-        float vNext = vPerZValue * zNext;
+        int uNext = (int)(uPerZValue * zNext);
+        int vNext = (int)(vPerZValue * zNext);
 
         // ld. "Scanline subdivision" itt: 
         // https://www.lysator.liu.se/~mikaelk/doc/perspectivetexture/
 
-        int uIncrement = (int)((uNext - u) * ((1 << UV_FRACTIONAL_BITS) / SCANLINE_SUBDIVISION));
-        int vIncrement = (int)((vNext - v) * ((1 << UV_FRACTIONAL_BITS) / SCANLINE_SUBDIVISION));
-
-        int textureXFixedPoint = (int)(u * (1 << UV_FRACTIONAL_BITS));
-        int textureYFixedPoint = (int)(v * (1 << UV_FRACTIONAL_BITS));
-
-        interp0->accum[0] = textureXFixedPoint;
-        interp0->base[0] = uIncrement;
-        interp0->accum[1] = textureYFixedPoint;
-        interp0->base[1] = vIncrement;
+        interp0->base[0] = (uNext - interp0->accum[0]) >> SCANLINE_SUBDIVISION_BITS; // uIncrement
+        interp0->base[1] = (vNext - interp0->accum[1]) >> SCANLINE_SUBDIVISION_BITS; // vIncrement
 
         //printf("Initial: %d, %d\n", u, v);
         //*(from++) = texture[(textureXFixedPoint >> UV_FRACTIONAL_BITS) +
         //        ((textureYFixedPoint >> UV_FRACTIONAL_BITS) << TEXTURE_STRIDE_BITS)]
 
-        *(from++) = *(uint16_t*)interp0->pop[2];
-        if (from == to)
-            return;
-        *(from++) = *(uint16_t*)interp0->pop[2];
-        if (from == to)
-            return;
-        *(from++) = *(uint16_t*)interp0->pop[2];
-        if (from == to)
-            return;
-        *(from++) = *(uint16_t*)interp0->pop[2];
-        if (from == to)
-            return;
-        *(from++) = *(uint16_t*)interp0->pop[2];
-        if (from == to)
-            return;
-        *(from++) = *(uint16_t*)interp0->pop[2];
-        if (from == to)
-            return;
-        *(from++) = *(uint16_t*)interp0->pop[2];
-        if (from == to)
-            return;
-        *(from++) = *(uint16_t*)interp0->pop[2];
+        if (to - from > 8) {
+            zReciprocalValue += zReciprocal.by8X;
+            zNext = 1.0f / zReciprocalValue; // a lenti írásokkal párhuzamosan menjen ez az osztás
+        }
 
-        z = zNext;
-        u = uNext;
-        v = vNext;
+        *(from++) = *(uint16_t*)interp0->pop[2];
+        *(from++) = *(uint16_t*)interp0->pop[2];
+        *(from++) = *(uint16_t*)interp0->pop[2];
+        *(from++) = *(uint16_t*)interp0->pop[2];
+        *(from++) = *(uint16_t*)interp0->pop[2];
+        *(from++) = *(uint16_t*)interp0->pop[2];
+        *(from++) = *(uint16_t*)interp0->pop[2];
+        *(from++) = *(uint16_t*)interp0->pop[2];
     }
 }
 

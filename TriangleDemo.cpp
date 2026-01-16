@@ -1,5 +1,6 @@
 #include "TriangleDemo.hpp"
 #include "pico/rand.h"
+#include <array>
 
 TriangleDemo::TriangleDemo() {
     for (int i = 0; i < 15; i++) {
@@ -27,18 +28,19 @@ void TriangleDemo::update() {
         t.pos += t.dir;
     }
 
+    std::array<Point2D, 2> leftPoints = { {
+        { x: 0.0f, y : 0.0f },
+        { x: 0.0f, y : (float)rasterizer->screenHeight() }
+    } };
+    std::array<Point2D, 2> rightPoints = { {
+        { x: (float)rasterizer->screenWidth(), y : 0.0f },
+        { x: (float)rasterizer->screenWidth(), y : (float)rasterizer->screenHeight() },
+    } };
     ConvexShape* background = ConvexShape::create(
-        {
-            { x: 0.0f, y : 0.0f },
-            { x: 0.0f, y : (float) rasterizer->screenHeight() }
-        },
-        {
-            { x: (float) rasterizer->screenWidth(), y : 0.0f },
-            { x: (float) rasterizer->screenWidth(), y : (float) rasterizer->screenHeight() },
-        },
+        leftPoints, rightPoints,
         0.0f,
         new ColorFill(0xFFFFFFFF)
-        );
+    );
     rasterizer->shapes.push_back(background);
 
     for (int i = 0; i < triangles.size(); i++) {
@@ -53,8 +55,8 @@ Triangle::Triangle() :
          .y = get_rand_32() % (480 - 100)
         }),
     dir({
-        .x = (float) (sqrt(get_rand_32() % 10000) - 50) / 50,
-        .y = (float) (sqrt(get_rand_32() % 10000) - 50) / 50,
+        .x = (float)(sqrt(get_rand_32() % 10000) - 50) / 50,
+        .y = (float)(sqrt(get_rand_32() % 10000) - 50) / 50,
         }),
         color(get_rand_32() & 0x00FFFFFF | 0xAA000000) {
 }
@@ -74,28 +76,25 @@ uint32_t Triangle::sqrt(uint32_t x) {
 
 
 ConvexShape* Triangle::toShape(float z) {
-    return ConvexShape::create(
-        {
+    std::array<Point2D, 2> leftPoints = { {
             {
                 .x = pos.x + 50.0f,
-                .y = pos.y
+                    .y = pos.y
             },
             {
                 .x = pos.x,
                 .y = pos.y + 100.0f
             }
-        },
-        {
+    } };
+    std::array<Point2D, 2> rightPoints = { {
             {
                 .x = pos.x + 50.0f,
-                .y = pos.y
+                    .y = pos.y
             },
-            {
-                .x = pos.x + 100.0f,
-                .y = pos.y + 100.0f
-            }
-        },
-        z,
-        new ColorFill(color)
-    );
+        {
+            .x = pos.x + 100.0f,
+            .y = pos.y + 100.0f
+        }
+    } };
+    return ConvexShape::create(std::span{ leftPoints }, std::span{ rightPoints }, z, new ColorFill(color));
 }

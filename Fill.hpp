@@ -31,6 +31,9 @@ public:
                           int relativeX, int relativeY);
     virtual std::string toString();
 
+    static void initDMAChannel();
+    static void waitForDMAChannelToFinish();
+
 private:
     static Color blendColorsDstOpaque(Color dst, Color src);
 };
@@ -71,4 +74,6 @@ public:
                           std::vector<ConvexShape*>& shapeStack,
                           int relativeX, int relativeY);
     virtual std::string toString();
+
+    static const int UV_FRACTIONAL_BITS = 12;
 };

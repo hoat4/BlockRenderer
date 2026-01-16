@@ -53,7 +53,7 @@ class LineBuffer {
     public:
         int lineNumber;
         uint16_t* buffer;
-        ~LineBuffer();
+        void doneWriting();
 };
 
 class DVIDisplay {

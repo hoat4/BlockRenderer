@@ -7,7 +7,6 @@ private:
     int width;
     int height;
     Rasterizer rasterizer;
-    int expectedY;
     Scene* scene;
 
 public:

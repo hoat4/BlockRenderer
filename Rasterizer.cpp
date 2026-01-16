@@ -4,11 +4,15 @@
 #include <memory>
 #include <math.h>
 
+#include <pico/stdlib.h> // get_absolute_time
+
 const bool TRACE_CHANGE_ACTIVE_LIST = false;
 const bool TRACE_FILLS = false;
 
 Rasterizer::Rasterizer(int width, int height) : width(width), height(height) {
     shapeListsByLine.resize(height);
+
+    ColorFill::initDMAChannel(); // TODO ezt csak egyszer kéne
 }
 
 int Rasterizer::screenWidth() {
@@ -47,14 +51,22 @@ void Rasterizer::skipLines(int lines) {
     }
 }
 
+void Rasterizer::prepareLine() {
+    if (TRACE_FILLS || TRACE_CHANGE_ACTIVE_LIST)
+        printf("line %d\n", y);
+    processCurrentLine();
+}
+
 void Rasterizer::renderLine(uint16_t* buffer) {
     //if (y == 300)
     //    TRACE_FILLS = true;
 
-    if (TRACE_FILLS || TRACE_CHANGE_ACTIVE_LIST)
-        printf("line %d\n", y);
-    processCurrentLine();
+    absolute_time_t t1 = get_absolute_time();
     renderSpans(buffer);
+    absolute_time_t t2 = get_absolute_time();
+    ColorFill::waitForDMAChannelToFinish();
+    absolute_time_t t3 = get_absolute_time();
+    //printf("%lld, %lld\n", t2 - t1, t3 - t2);
 
     //if (y == 300)
     //    TRACE_FILLS = false;
@@ -276,7 +288,7 @@ float ConvexShape::slope(Point2D top, Point2D bottom) {
 
 IntermediateVertex ConvexShape::makeIntermediateVertex(Point2D top, Point2D bottom, bool isLeft) {
     return {
-        .y = (int) std::floor(top.y),
+        .y = (int)std::floor(top.y),
         .isLeft = isLeft,
         .x = top.x,
         .slope = slope(top, bottom)
@@ -284,7 +296,7 @@ IntermediateVertex ConvexShape::makeIntermediateVertex(Point2D top, Point2D bott
 }
 
 ConvexShape* ConvexShape::create(
-    std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints,
+    std::span<Point2D> leftPoints, std::span<Point2D> rightPoints,
     float z,
     Fill* fill) {
 
@@ -311,7 +323,7 @@ ConvexShape* ConvexShape::create(
     return shape;
 }
 
-void ConvexShape::modifyPoints(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints,
+void ConvexShape::modifyPoints(std::span<Point2D> leftPoints, std::span<Point2D> rightPoints,
                                float z) {
     if (leftPoints.size() < 2 || rightPoints.size() < 2)
         throw "too few points";
@@ -325,8 +337,8 @@ void ConvexShape::modifyPoints(std::vector<Point2D> leftPoints, std::vector<Poin
         throw "intermediate vertex count too large";
 
 
-    this->top = (int) std::floor(leftPoints.front().y);
-    this->bottom = (int) std::ceil(leftPoints.back().y);
+    this->top = (int)std::floor(leftPoints.front().y);
+    this->bottom = (int)std::ceil(leftPoints.back().y);
     this->z = z;
 
     if (top == bottom)

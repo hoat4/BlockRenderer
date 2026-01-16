@@ -3,6 +3,7 @@
 #include <vector>
 #include "Fill.hpp"
 #include <memory>
+#include <span>
 
 class Fill;
 
@@ -77,7 +78,7 @@ public:
      * A pontok fentről lefele menjenek, és az első pont y-ja ugyanaz legyen mindkettő listában,
      * valamint az utolsó pont y-ja is ugyanaz legyen mindkettő listában.
      */
-    static ConvexShape* create(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints,
+    static ConvexShape* create(std::span<Point2D> leftPoints, std::span<Point2D> rightPoints,
                                float z, Fill* fill);
 
     /**
@@ -86,7 +87,7 @@ public:
     static ConvexShape* create(int maxLeftPoints, int maxRightPoints,
                                Fill* fill);
 
-    void modifyPoints(std::vector<Point2D> leftPoints, std::vector<Point2D> rightPoints,
+    void modifyPoints(std::span<Point2D> leftPoints, std::span<Point2D> rightPoints,
                       float z);
 
     ~ConvexShape();
@@ -115,6 +116,7 @@ public:
 
     void skipLines(int lines);
 
+    void prepareLine();
     void renderLine(uint16_t* buffer);
 
     int screenWidth();

@@ -334,7 +334,7 @@ LineBuffer DVIDisplay::nextLine() {
 
     int waitCount = 0;
     // legyen elég front/back porchhoz
-    const int STALL_LIMIT = 10000; // 1000
+    const int STALL_LIMIT = 20000; // 1000
 
     for (; waitCount<STALL_LIMIT; waitCount++) {
         toBeWritten = lineBuffers_write;
@@ -348,7 +348,7 @@ LineBuffer DVIDisplay::nextLine() {
             if (toBeWritten >= minWriteable || toBeWritten <= maxWriteable)
                 break;
         }
-        sleep_us(10);
+        sleep_us(5);
     }
 
     if (waitCount == STALL_LIMIT) {
@@ -394,7 +394,7 @@ LineBuffer DVIDisplay::nextLine() {
 
 LineBuffer::LineBuffer() {}
 
-LineBuffer::~LineBuffer() {
+void LineBuffer::doneWriting() {
     display->lineBuffers_write = (display->lineBuffers_write+1) % display->frame_height;
 }
 
