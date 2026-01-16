@@ -114,7 +114,7 @@ void TextureFill::initInterpolator() {
     interp_set_config(interp0, 1, &cfg);
 }
 
-void TextureFill::fillSpan(uint16_t* from, uint16_t* to,
+void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
                            std::vector<ConvexShape*>& shapeStack,
                            int x2, int y2) {
 
@@ -135,24 +135,6 @@ void TextureFill::fillSpan(uint16_t* from, uint16_t* to,
         throw "texture coordinates out of bounds (1)";
     }
 
-    /*
-    int advance = to - from;
-    float zEnd = 1 / (zReciprocalValue + advance * zReciprocal.byX);
-    float uEnd = (uPerZValue + advance * uPerZ.byX) * zEnd;
-    float vEnd = (vPerZValue + advance * vPerZ.byX) * zEnd;
-    if (uEnd < 0 || uEnd >= TEXTURE_SIZE || vEnd < 0 || vEnd >= TEXTURE_SIZE) {
-        /*
-        while (from != to)
-            *(from++) = 0xF000;
-        return;
-        *
-        throw "texture coordinates out of bounds (2)";
-    }
-        */
-
-        //printf("(%f, %f): z: %f, u: %f, v: %f\n", x, y, z, u, v);
-        //printf("v: %d,y:%d\n", v.floor(), y);
-
     interp0->base[2] = (uintptr_t)texture;
     interp0->accum[0] = u;
     interp0->accum[1] = v;
@@ -170,18 +152,18 @@ void TextureFill::fillSpan(uint16_t* from, uint16_t* to,
         // ld. "Scanline subdivision" itt: 
         // https://www.lysator.liu.se/~mikaelk/doc/perspectivetexture/
 
-        interp0->base[0] = (uNext - interp0->accum[0]) >> SCANLINE_SUBDIVISION_BITS; // uIncrement
-        interp0->base[1] = (vNext - interp0->accum[1]) >> SCANLINE_SUBDIVISION_BITS; // vIncrement
-
-        //printf("Initial: %d, %d\n", u, v);
-        //*(from++) = texture[(textureXFixedPoint >> UV_FRACTIONAL_BITS) +
-        //        ((textureYFixedPoint >> UV_FRACTIONAL_BITS) << TEXTURE_STRIDE_BITS)]
+        interp0->base[0] = (uNext - u) >> SCANLINE_SUBDIVISION_BITS; // uIncrement
+        interp0->base[1] = (vNext - v) >> SCANLINE_SUBDIVISION_BITS; // vIncrement
 
         if (to - from > 8) {
+            u = uNext;
+            v = vNext;
             zReciprocalValue += zReciprocal.by8X;
-            zNext = 1.0f / zReciprocalValue; // a lenti írásokkal párhuzamosan menjen ez az osztás
+            zNext = 1.0f / zReciprocalValue; // a lenti memóriaírásokkal párhuzamosan menjen ez az osztás
         }
 
+        //*(from++) = texture[(textureXFixedPoint >> UV_FRACTIONAL_BITS) +
+        //        ((textureYFixedPoint >> UV_FRACTIONAL_BITS) << TEXTURE_STRIDE_BITS)]
         *(from++) = *(uint16_t*)interp0->pop[2];
         *(from++) = *(uint16_t*)interp0->pop[2];
         *(from++) = *(uint16_t*)interp0->pop[2];

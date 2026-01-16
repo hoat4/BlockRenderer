@@ -260,7 +260,7 @@ void Rasterizer::renderSpans(uint16_t* buffer) {
 /**
  * fromFP nem lehet negatív (mert intté kasztolás rosszul működne, de amúgy is értelmetlen)
  */
-void Rasterizer::fillSpan(uint16_t* buffer,
+void __not_in_flash_func(Rasterizer::fillSpan)(uint16_t* buffer,
                           float fromFP, float toFP) {
     if (fromFP < 0)
         throw "negative fromFP";
