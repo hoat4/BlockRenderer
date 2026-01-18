@@ -26,16 +26,11 @@ void processFile(String filename, String variableName) throws Throwable {
         throw new RuntimeException("wrong image size");
 
     out.append("const uint16_t "+variableName+"[] = {\n");
-    for (int row = 0; row < 18; row++) {
+    for (int row = 0; row < 16; row++) {
         out.append("\t");
-        for (int col = 0; col < 18; col++) {
-            int srcRow = Math.max(0, Math.min(15, row - 1));
-            int srcCol = Math.max(0, Math.min(15, col - 1));
-            RGB color = at(srcCol, srcRow);
+        for (int col = 0; col < 16; col++) {
+            RGB color = at(col, row);
             out.append(String.format("0x%04x, ", color.toRGB565()));
-        }
-        for (int col = 18; col < 32; col++) {
-            out.append("0, ");
         }
         out.append("\n");
     }

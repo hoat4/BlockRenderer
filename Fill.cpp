@@ -3,6 +3,7 @@
 #include <iomanip>
 #include "hardware/interp.h"
 #include "hardware/dma.h"
+#include "arm_acle.h"
 
 int dmaChannel;
 dma_channel_config dmaChannelConfig;
@@ -74,8 +75,9 @@ Color ColorFill::blendColorsDstOpaque(Color dst, Color src) {
     return 0xFF000000 | (ro & 0xFF00) << 8 | (go & 0xFF00) | bo >> 8;
 }
 
-const int TEXTURE_STRIDE_BITS = 5;
-const int TEXTURE_SIZE = 18;
+// először volt külön TEXTURE_STRIDE is mert __usat helyett padding volt, de __usat miatt muszáj kettő-hatványnak lennie a textúraméretnek
+const int TEXTURE_SIZE_BITS = 4;
+const int TEXTURE_SIZE = 1 << TEXTURE_SIZE_BITS;
 const int MAX_TEXTURE_ROW_BITS = 5;
 const int SCANLINE_SUBDIVISION_BITS = 3;
 const int SCANLINE_SUBDIVISION = 1 << SCANLINE_SUBDIVISION_BITS;
@@ -86,11 +88,11 @@ void TextureFill::initInterpolator() {
     // it to the lane base to make the lane result
     interp_config_set_add_raw(&cfg, true);
     interp_config_set_shift(&cfg, UV_FRACTIONAL_BITS - 1);
-    interp_config_set_mask(&cfg, 1, TEXTURE_STRIDE_BITS - 1 + 1);
+    interp_config_set_mask(&cfg, 1, TEXTURE_SIZE_BITS - 1 + 1);
     interp_set_config(interp0, 0, &cfg);
 
-    interp_config_set_shift(&cfg, UV_FRACTIONAL_BITS - TEXTURE_STRIDE_BITS - 1);
-    interp_config_set_mask(&cfg, TEXTURE_STRIDE_BITS + 1, TEXTURE_STRIDE_BITS + MAX_TEXTURE_ROW_BITS - 1 + 1);
+    interp_config_set_shift(&cfg, UV_FRACTIONAL_BITS - TEXTURE_SIZE_BITS - 1);
+    interp_config_set_mask(&cfg, TEXTURE_SIZE_BITS + 1, TEXTURE_SIZE_BITS + MAX_TEXTURE_ROW_BITS - 1 + 1);
     interp_set_config(interp0, 1, &cfg);
 }
 
@@ -105,10 +107,16 @@ void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
     float vPerZValue = vPerZ.valueAt(x, y);
 
     float z = 1 / zReciprocalValue;
-    int u = (int)(uPerZValue * z);
-    int v = (int)(vPerZValue * z);
+    int u = __usat((int)(uPerZValue * z), (UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS));
+    int v = __usat((int)(vPerZValue * z), (UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS));
 
+    //printf("v: %d, orig v: %d\n", v, (int)(vPerZValue * z));
+    // ez az if már felesleges, mert usat miatt nem lehetséges ilyen (ami nem feltétlen jó,
+    // mert a tényleges se tudjuk így kiszűrni)
     if (u < 0 || u >= TEXTURE_SIZE << UV_FRACTIONAL_BITS || v < 0 || v >= TEXTURE_SIZE << UV_FRACTIONAL_BITS) {
+        printf("u: %d, v: %d, original pos: (%d, %d), base: (%f, %f)\n", u, v, x2, y2, baseX, baseY);
+        printf("1/z base: %f, value: %f\n", zReciprocal.base, zReciprocalValue);
+        printf("v/z base: %f, value: %f\n", vPerZ.base, vPerZValue);
         throw "texture coordinates out of bounds (1)";
     }
 
@@ -123,8 +131,8 @@ void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
         uPerZValue += uPerZ.by8X;
         vPerZValue += vPerZ.by8X;
 
-        int uNext = (int)(uPerZValue * zNext);
-        int vNext = (int)(vPerZValue * zNext);
+        int uNext = __usat((int)(uPerZValue * zNext), UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS);
+        int vNext = __usat((int)(vPerZValue * zNext), UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS);
 
         // ld. "Scanline subdivision" itt: 
         // https://www.lysator.liu.se/~mikaelk/doc/perspectivetexture/
@@ -134,7 +142,7 @@ void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
 
 
         //*(from++) = texture[(textureXFixedPoint >> UV_FRACTIONAL_BITS) +
-        //        ((textureYFixedPoint >> UV_FRACTIONAL_BITS) << TEXTURE_STRIDE_BITS)]
+        //        ((textureYFixedPoint >> UV_FRACTIONAL_BITS) << TEXTURE_SIZE_BITS)]
 
         if (to - from > 8) {
             u = uNext;

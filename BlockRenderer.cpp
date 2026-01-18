@@ -52,7 +52,7 @@ int main() {
             absolute_time_t t2 = get_absolute_time();
             rasterizer.renderLine(lineBuffer.buffer);
             absolute_time_t t3 = get_absolute_time();
-            if (absolute_time_diff_us(t2, t3) >= 30 && false)
+            if (absolute_time_diff_us(t2, t3) >= 30)
                 printf("Rendering row %d took %lld microseconds\n", y, absolute_time_diff_us(t2, t3));
         } catch (const char* msg) {
             panic("failed to render line %d: %s\n", y, msg);
