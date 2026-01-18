@@ -4,10 +4,6 @@
 #include "hardware/interp.h"
 #include "hardware/dma.h"
 
-bool ColorFill::isOpaque() {
-    return (color & 0xFF000000) == 0xFF000000;
-}
-
 int dmaChannel;
 dma_channel_config dmaChannelConfig;
 int dmaBuffer;
@@ -26,23 +22,7 @@ void ColorFill::waitForDMAChannelToFinish() {
     dma_channel_wait_for_finish_blocking(dmaChannel);
 }
 
-void ColorFill::fillSpan(uint16_t* from, uint16_t* to,
-                         std::vector<ConvexShape*>& shapeStack,
-                         int x, int y) {
-    int firstOpaque = shapeStack.size() - 1;
-    while (!shapeStack[firstOpaque]->fill->isOpaque()) {
-        if (firstOpaque == 0)
-            throw "no opaque shapes on stack";
-        firstOpaque--;
-    }
-
-    // TODO textúrára overlayelt color esetén ez elszáll
-
-    Color color = reinterpret_cast<ColorFill*>(shapeStack[firstOpaque]->fill)->color;
-    for (int i = firstOpaque + 1; i < shapeStack.size(); i++)
-        color = blendColorsDstOpaque(color,
-                                     reinterpret_cast<ColorFill*>(shapeStack[i]->fill)->color);
-
+void ColorFill::fillSpan(uint16_t* from, uint16_t* to, int x, int y) {
     unsigned int r = color >> 16 & 0xFF, g = color >> 8 & 0xFF, b = color & 0xFF;
 
     uint16_t rgb565 = ((r & 0b11111000) << 8) | ((g & 0b11111100) << 3) | ((b & 0b11111000) >> 3);
@@ -115,10 +95,7 @@ void TextureFill::initInterpolator() {
 }
 
 void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
-                           std::vector<ConvexShape*>& shapeStack,
-                           int x2, int y2) {
-
-
+                                                int x2, int y2) {
     float x = x2 - baseX;
     float y = y2 - baseY;
 
@@ -155,6 +132,10 @@ void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
         interp0->base[0] = (uNext - u) >> SCANLINE_SUBDIVISION_BITS; // uIncrement
         interp0->base[1] = (vNext - v) >> SCANLINE_SUBDIVISION_BITS; // vIncrement
 
+
+        //*(from++) = texture[(textureXFixedPoint >> UV_FRACTIONAL_BITS) +
+        //        ((textureYFixedPoint >> UV_FRACTIONAL_BITS) << TEXTURE_STRIDE_BITS)]
+
         if (to - from > 8) {
             u = uNext;
             v = vNext;
@@ -162,8 +143,6 @@ void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
             zNext = 1.0f / zReciprocalValue; // a lenti memóriaírásokkal párhuzamosan menjen ez az osztás
         }
 
-        //*(from++) = texture[(textureXFixedPoint >> UV_FRACTIONAL_BITS) +
-        //        ((textureYFixedPoint >> UV_FRACTIONAL_BITS) << TEXTURE_STRIDE_BITS)]
         *(from++) = *(uint16_t*)interp0->pop[2];
         *(from++) = *(uint16_t*)interp0->pop[2];
         *(from++) = *(uint16_t*)interp0->pop[2];
@@ -173,10 +152,6 @@ void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
         *(from++) = *(uint16_t*)interp0->pop[2];
         *(from++) = *(uint16_t*)interp0->pop[2];
     }
-}
-
-bool TextureFill::isOpaque() {
-    return true;
 }
 
 std::string TextureFill::toString() {

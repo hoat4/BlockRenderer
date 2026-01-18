@@ -36,6 +36,7 @@ void Rasterizer::beginFrame() {
         s->nextInTopRow = shapeListsByLine[s->top];
         s->prevInActiveList = NULL;
         s->nextInActiveList = NULL;
+        s->prevInStack = NULL;
         shapeListsByLine[s->top] = s;
     }
 
@@ -64,8 +65,6 @@ void Rasterizer::renderLine(uint16_t* buffer) {
     absolute_time_t t1 = get_absolute_time();
     renderSpans(buffer);
     absolute_time_t t2 = get_absolute_time();
-    ColorFill::waitForDMAChannelToFinish();
-    absolute_time_t t3 = get_absolute_time();
     //printf("%lld, %lld\n", t2 - t1, t3 - t2);
 
     //if (y == 300)
@@ -74,15 +73,19 @@ void Rasterizer::renderLine(uint16_t* buffer) {
     y++;
 }
 
+void Rasterizer::waitForLineFinish() {
+    ColorFill::waitForDMAChannelToFinish();
+}
+
 void Rasterizer::addToActiveList(ConvexShape* shapeToAdd) {
     if (TRACE_CHANGE_ACTIVE_LIST || TRACE_FILLS) {
         printf("Before addToActiveList: ");
         printActiveShapes();
-        printf("Add %s at %d-%d\n", shapeToAdd->fill->toString().c_str(),
-               shapeToAdd->leftX, shapeToAdd->rightX);
+        printf("Add %s at %f-%f (z-index: %f)\n", shapeToAdd->fill->toString().c_str(),
+               shapeToAdd->leftX, shapeToAdd->rightX, shapeToAdd->z);
     }
     ConvexShape* addAfter = NULL;
-    for (ConvexShape* shape = activeShapes; shape && shape->leftX <= shapeToAdd->leftX; shape = shape->nextInActiveList) {
+    for (ConvexShape* shape = activeShapes; shape && shouldBeAfterInActiveShapeList(shapeToAdd, shape); shape = shape->nextInActiveList) {
         addAfter = shape;
     }
     if (addAfter == shapeToAdd)
@@ -115,8 +118,13 @@ void Rasterizer::removeFromActiveList(ConvexShape* shape) {
     shape->nextInActiveList = NULL;
 }
 
+bool Rasterizer::shouldBeAfterInActiveShapeList(ConvexShape* shape, ConvexShape* other) {
+    int ax = (int)shape->leftX, bx = (int)other->leftX;
+    return ax > bx || ax == bx && shape->z < other->z;
+}
+
 void Rasterizer::shiftLeftInActiveList(ConvexShape* shape) {
-    while (shape->prevInActiveList && shape->leftX < shape->prevInActiveList->leftX) {
+    while (shape->prevInActiveList && !shouldBeAfterInActiveShapeList(shape, shape->prevInActiveList)) {
         ConvexShape* prev = shape->prevInActiveList;
         if (shape->nextInActiveList)
             shape->nextInActiveList->prevInActiveList = prev;
@@ -168,7 +176,10 @@ void Rasterizer::processCurrentLine() {
 void Rasterizer::checkActiveShapes() {
     ConvexShape* prevS = NULL;
     for (ConvexShape* shape = activeShapes; shape; shape = shape->nextInActiveList) {
-        if (prevS && (shape->leftX < prevS->leftX || shape->prevInActiveList != prevS)) {
+        if (prevS && ((int) shape->leftX < (int) prevS->leftX || shape->prevInActiveList != prevS ||
+                      (int)shape->leftX == (int)prevS->leftX && shape->z > prevS->z)) {
+            printActiveShapes();
+            printf("leftx: %f, %f\n", shape->leftX, prevS->leftX);
             throw "wrong active shapes";
         }
         prevS = shape;
@@ -198,89 +209,61 @@ bool Rasterizer::processBreaksOnCurrentLine(ConvexShape* shape) {
 void Rasterizer::printActiveShapes() {
     printf("Active shapes: ");
     for (ConvexShape* shape = activeShapes; shape; shape = shape->nextInActiveList) {
-        printf("%s at %f-%f, ", shape->fill->toString().c_str(), shape->leftX, shape->rightX);
+        printf("%s at %f-%f (z-index %f), ", shape->fill->toString().c_str(), shape->leftX, shape->rightX, shape->z);
     }
     printf("\n");
 }
 
 void Rasterizer::renderSpans(uint16_t* buffer) {
-    if (!shapeStack.empty())
-        throw "activeShapes size not zero (at begin)";
-
     if (TRACE_FILLS) {
         printActiveShapes();
     }
 
     TextureFill::initInterpolator();
 
-    float prevX = 0;
-    ConvexShape* nextLeft = activeShapes;
-    while (true) {
-        int shapeWithNearestRight = -1;
-        float nearestRight = std::numeric_limits<float>::infinity();
-        for (int i = 0; i < shapeStack.size(); i++) {
-            if (shapeStack[i]->rightX < nearestRight) {
-                shapeWithNearestRight = i;
-                nearestRight = shapeStack[i]->rightX;
+    // TODO right<=0-eket kiszűrni
+    ConvexShape* shape = activeShapes;
+
+    int prevX = 0;
+    for (; shape; shape = shape->nextInActiveList) {
+        int shapeLeft = (int)shape->leftX;
+        int shapeRight = (int)shape->rightX;
+
+        int rightClip = shapeRight;
+        ConvexShape* rightClipShape = NULL;
+        for (ConvexShape* s = shape->nextInActiveList; s; s = s->nextInActiveList) {
+            int sLeft = (int)s->leftX;
+            if (sLeft == shapeLeft)
+                continue;
+            if (sLeft >= shapeRight)
+                break;
+            if (s->z > shape->z && (!rightClipShape || s->z > rightClipShape->z && sLeft <= rightClip)) {
+                rightClipShape = s;
+                rightClip = sLeft;
             }
         }
-        if (shapeWithNearestRight != -1 && (nextLeft == NULL || nearestRight <= nextLeft->leftX)) {
-            if (TRACE_FILLS)
-                printf("RIGHT at %f-%f\n", prevX, nearestRight);
-            fillSpan(buffer, prevX, nearestRight);
-            prevX = nearestRight;
-            shapeStack.erase(shapeStack.begin() + shapeWithNearestRight);
-        } else if (nextLeft) {
-            if (TRACE_FILLS)
-                printf("LEFT at %f-%f\n", prevX, nextLeft->leftX);
-            fillSpan(buffer, prevX, nextLeft->leftX);
-            prevX = nextLeft->leftX;
 
-            bool inserted = false;
-            for (auto it = shapeStack.begin(); it != shapeStack.end(); ++it) {
-                if ((*it)->z > nextLeft->z) {
-                    shapeStack.insert(it, nextLeft);
-                    inserted = true;
-                    break;
-                }
+        int from = std::max(shapeLeft, prevX);
+        int to = std::min(rightClip, width);
+        if (from < to) {
+            if (prevX < from) {
+                if (TRACE_FILLS)
+                    printf("Fill background %d-%d\n", prevX, from);
+                background->fillSpan(&buffer[prevX], &buffer[from], prevX, y);
             }
-            if (!inserted)
-                shapeStack.push_back(nextLeft);
-
-            nextLeft = nextLeft->nextInActiveList;
-        } else {
-            break;
+            if (TRACE_FILLS)
+                printf("Fill %d-%d with %s\n", from, to, shape->fill->toString().c_str());
+            shape->fill->fillSpan(&buffer[from], &buffer[to], from, y);
+            prevX = to;
         }
     }
-
-    if (!shapeStack.empty())
-        throw "activeShapes size not zero (at end)";
-}
-
-/**
- * fromFP nem lehet negatív (mert intté kasztolás rosszul működne, de amúgy is értelmetlen)
- */
-void __not_in_flash_func(Rasterizer::fillSpan)(uint16_t* buffer,
-                          float fromFP, float toFP) {
-    if (fromFP < 0)
-        throw "negative fromFP";
-
-    int from = std::max((int)fromFP, 0);
-    int to = std::min((int)toFP, width);
-    if (from >= to)
-        return;
-
-    if (shapeStack.empty()) {
-        printf("span: %f-%f\n", fromFP, toFP);
-        throw "shape stack empty";
+    if (prevX < width) {
+        if (TRACE_FILLS)
+            printf("Fill background %d-%d\n", prevX, width);
+        background->fillSpan(&buffer[prevX], &buffer[width], prevX, y);
     }
-
-    ConvexShape* lastShape = shapeStack.back();
-    if (TRACE_FILLS)
-        printf("fill with %s\n", lastShape->fill->toString().c_str());
-
-    lastShape->fill->fillSpan(&buffer[from], &buffer[to], shapeStack, from, y);
 }
+
 
 float ConvexShape::slope(Point2D top, Point2D bottom) {
     return (bottom.x - top.x) / (std::floor(bottom.y) - std::floor(top.y));

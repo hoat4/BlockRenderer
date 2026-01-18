@@ -6,19 +6,20 @@
 
 Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
     //addCube(Point3DInt(2, 0, 3), GRASS);
-    addCube(Point3DInt(1, -2, 4), GRASS);
-    addCube(Point3DInt(-2, -2, 4), DIRT);
-    addCube(Point3DInt(-1, -2, 4), DIRT);
-    addCube(Point3DInt(-3, -2, 4), DIRT);
-    addCube(Point3DInt(-4, -2, 4), DIRT);
+    for (int x = -4; x <= 3; x++) {
+        for (int y = -2; y <= -2; y++) {
+            addCube(Point3DInt(x, y, 4), x >= 0 ? GRASS : DIRT);
+        }
+    }
     //    addCube(Point3DInt(-2, -2, 5), DIRT);
     //    addCube(Point3DInt(-2, 2, 4), DIRT);
-    addCube(Point3DInt(-2, 1, 4), DIRT);
-    addCube(Point3DInt(-2, 0, 4), DIRT);
-    addCube(Point3DInt(-2, 1, 4), DIRT);
+    //addCube(Point3DInt(-2, 1, 4), DIRT);
     addCube(Point3DInt(-2, -1, 4), DIRT);
     //addCube(Point3DInt(-2, -2, 6), DIRT);
     //    addCube(Point3DInt(-1, -2, 6), DIRT);
+
+            //addCube(Point3DInt(0, 0, 4), GRASS);
+            //addCube(Point3DInt(1, 0, 4), DIRT);
 
     frameID = 0;
 }
@@ -36,25 +37,12 @@ void Cubes::update() {
         printf("create bg\n");
         aspectRatio = (float)rasterizer->screenWidth() / (float)rasterizer->screenHeight();
 
-        std::array<Point2D, 2> leftPoints = { {
-            { x: 0.0f, y : 0.0f },
-            { x: 0.0f, y : (float)rasterizer->screenHeight() }
-        } };
-        std::array<Point2D, 2> rightPoints = { {
-            { x: (float)rasterizer->screenWidth(), y : 0.0f },
-            { x: (float)rasterizer->screenWidth(), y : (float)rasterizer->screenHeight() },
-        } };
-        ConvexShape* background = ConvexShape::create(
-            leftPoints, rightPoints,
-            -std::numeric_limits<float>::infinity(),
-            new ColorFill(0xFF55EEFF)
-        );
-        rasterizer->shapes.push_back(background);
+        rasterizer->background = new ColorFill(0xFF55EEFF);
     }
 
     frameID++;
 
-    rasterizer->shapes.erase(rasterizer->shapes.begin() + 1, rasterizer->shapes.end());
+    rasterizer->shapes.erase(rasterizer->shapes.begin(), rasterizer->shapes.end());
 
     for (auto it = cubes.begin(); it != cubes.end(); ++it) {
         Cube& cube = *it;
@@ -139,6 +127,14 @@ Point3DInt CUBE_VERTEX_OFFSETS[] = {
     /* SOUTH */  Point3DInt(0, 1, 0), Point3DInt(1, 1, 0), Point3DInt(0, 0, 0), Point3DInt(1, 0, 0),
     /* EAST */   Point3DInt(1, 1, 0), Point3DInt(1, 1, 1), Point3DInt(1, 0, 0), Point3DInt(1, 0, 1),
 };
+Point3D FACE_CENTER_OFFSETS[] = {
+    /* TOP */ Point3D(0.5, 1, 0.5),
+    /* BOTTOM */ Point3D(0.5, 0, 0.5),
+    /* NORTH */ Point3D(0.5, 0.5, 1),
+    /* WEST */ Point3D(0, 0.5, 0.5),
+    /* SOUTH */ Point3D(0.5, 0.5, 0),
+    /* EAST */ Point3D(1, 0.5, 0.5),
+};
 
 Point2D Cubes::projectCubeFace(Cube& cube, CubeFace face) {
     // kamera pozíció és forgás alapján eliminálni lehetne a sortot
@@ -197,16 +193,12 @@ printf("projected points: %d,%d; %d,%d; %d,%d; %d,%d\n",
     leftPoints[leftPointCount++] = points[3];
     rightPoints[rightPointCount++] = points[3];
 
-    Point3D cubeCenter(
-        cube.pos.x + 0.5f,
-        cube.pos.y + 0.5f,
-        cube.pos.z + 0.5f
-    );
-    float zIndex = Point3D::distanceSq(cubeCenter, cameraPos);
+    Point3D faceCenter = cube.pos + FACE_CENTER_OFFSETS[face];
+    float zIndex = Point3D::distanceSq(faceCenter, cameraPos);
 
     cube.cachedShapes[face]->modifyPoints(
-        std::span{leftPoints}.subspan(0, leftPointCount), 
-        std::span{rightPoints}.subspan(0, rightPointCount), 
+        std::span{ leftPoints }.subspan(0, leftPointCount),
+        std::span{ rightPoints }.subspan(0, rightPointCount),
         -zIndex
     );
 

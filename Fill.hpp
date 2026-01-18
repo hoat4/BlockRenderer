@@ -11,10 +11,11 @@ class ConvexShape;
 
 class Fill {
 public:
-    virtual bool isOpaque() = 0;
+    /**
+     * from != to
+     */
     virtual void fillSpan(uint16_t* from, uint16_t* to,
-                          std::vector<ConvexShape*>& shapeStack,
-                          int relativeX, int relativeY);
+                          int x, int y);
     virtual std::string toString() = 0;
 };
 
@@ -25,10 +26,8 @@ public:
 
     ColorFill(Color color) : color(color) {}
 
-    virtual bool isOpaque();
     virtual void fillSpan(uint16_t* from, uint16_t* to,
-                          std::vector<ConvexShape*>& shapeStack,
-                          int relativeX, int relativeY);
+                          int x, int y);
     virtual std::string toString();
 
     static void initDMAChannel();
@@ -69,10 +68,8 @@ public:
 
     static void initInterpolator();
 
-    virtual bool isOpaque();
     virtual void fillSpan(uint16_t* from, uint16_t* to,
-                          std::vector<ConvexShape*>& shapeStack,
-                          int relativeX, int relativeY);
+                          int x, int y);
     virtual std::string toString();
 
     static const int UV_FRACTIONAL_BITS = 12;

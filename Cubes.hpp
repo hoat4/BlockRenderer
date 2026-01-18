@@ -30,6 +30,10 @@ struct Point3DInt {
     inline Point3DInt operator + (Point3DInt other) {
         return Point3DInt(x + other.x, y + other.y, z + other.z);
     }
+
+    inline Point3D operator + (Point3D other) {
+        return Point3D(x + other.x, y + other.y, z + other.z);
+    }
 };
 
 // sorrend CUBE_VERTEX_OFFSETS-ben is van használva

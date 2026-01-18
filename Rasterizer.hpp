@@ -54,6 +54,8 @@ private:
     ConvexShape* prevInActiveList;
     ConvexShape* nextInActiveList;
 
+    ConvexShape* prevInStack;
+
     /**
      * Rasterizer::processCurrentLine-ból használva
      */
@@ -104,11 +106,15 @@ private:
     int height;
     int y = 0;
     std::vector<ConvexShape*> shapeListsByLine;
+
+    // sorrendje: 
+    // 1. (int) leftX
+    // 2. z
     ConvexShape* activeShapes;
-    std::vector<ConvexShape*> shapeStack;
 
 public:
     std::vector<ConvexShape*> shapes;
+    Fill* background;
 
     Rasterizer(int width, int height);
 
@@ -118,12 +124,14 @@ public:
 
     void prepareLine();
     void renderLine(uint16_t* buffer);
+    void waitForLineFinish();
 
     int screenWidth();
     int screenHeight();
 
 private:
     void addToActiveList(ConvexShape* shape);
+    bool shouldBeAfterInActiveShapeList(ConvexShape* shape, ConvexShape* other);
     void removeFromActiveList(ConvexShape* shape);
     void shiftLeftInActiveList(ConvexShape* shape);
     bool processBreaksOnCurrentLine(ConvexShape* shape);
