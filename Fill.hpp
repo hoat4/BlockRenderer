@@ -63,6 +63,10 @@ public:
     LerpableData zReciprocal;
     LerpableData uPerZ;
     LerpableData vPerZ;
+    int uvCacheY;
+    int* uvCache; // nem az U/V értékek vannak benne, hanem azok 8 pixelenkénti növekményei fixed point intben
+    int uvCacheInitialU;
+    int uvCacheInitialV;
 
     TextureFill() {}
 

@@ -72,10 +72,10 @@ class Cubes : public Scene {
     /** 
      * visszaad egy tetszőleges pontot, ami a kockán van
      */
-    Point2D projectCubeFace(Cube& cube, CubeFace face);
+    Point2D projectCubeFace(Cube& cube, CubeFace facep, int& maxWidth);
     ZUV computeZUV(Cube& cube, CubeFace face, float x, float y);
     void computeZUVMatrix(Cube& cube, CubeFace face, TextureFill& textureFill, Point2D origin);
-    Point2D projectPoint(Point3DInt p);
+    Point2D projectPoint(Point3DInt );
 };
 
 struct Cube {

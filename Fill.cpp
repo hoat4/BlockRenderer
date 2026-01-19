@@ -98,6 +98,32 @@ void TextureFill::initInterpolator() {
 
 void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
                                                 int x2, int y2) {
+    // TODO uvCache törlése új framekor
+    
+    if (uvCacheY == y2 - 1) {
+        interp0->base[2] = (uintptr_t)texture;
+        interp0->accum[0] = uvCacheInitialU;
+        interp0->accum[1] = uvCacheInitialV;
+        int* uvCacheIn = uvCache;
+
+        while (from < to) {
+            interp0->base[0] = *(uvCacheIn++);
+            interp0->base[1] = *(uvCacheIn++);
+
+            *(from++) = *(uint16_t*)interp0->pop[2];
+            *(from++) = *(uint16_t*)interp0->pop[2];
+            *(from++) = *(uint16_t*)interp0->pop[2];
+            *(from++) = *(uint16_t*)interp0->pop[2];
+            *(from++) = *(uint16_t*)interp0->pop[2];
+            *(from++) = *(uint16_t*)interp0->pop[2];
+            *(from++) = *(uint16_t*)interp0->pop[2];
+            *(from++) = *(uint16_t*)interp0->pop[2];
+        }
+        return;
+    }
+
+    uvCacheY = y2;
+
     float x = x2 - baseX;
     float y = y2 - baseY;
 
@@ -109,6 +135,9 @@ void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
     float z = 1 / zReciprocalValue;
     int u = __usat((int)(uPerZValue * z), (UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS));
     int v = __usat((int)(vPerZValue * z), (UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS));
+
+    uvCacheInitialU = u;
+    uvCacheInitialV = v;
 
     //printf("v: %d, orig v: %d\n", v, (int)(vPerZValue * z));
     // ez az if már felesleges, mert usat miatt nem lehetséges ilyen (ami nem feltétlen jó,
@@ -127,6 +156,8 @@ void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
     zReciprocalValue += zReciprocal.by8X;
     float zNext = 1.0f / zReciprocalValue;
 
+    int* uvCacheOut = uvCache;
+
     while (from < to) {
         uPerZValue += uPerZ.by8X;
         vPerZValue += vPerZ.by8X;
@@ -137,8 +168,8 @@ void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
         // ld. "Scanline subdivision" itt: 
         // https://www.lysator.liu.se/~mikaelk/doc/perspectivetexture/
 
-        interp0->base[0] = (uNext - u) >> SCANLINE_SUBDIVISION_BITS; // uIncrement
-        interp0->base[1] = (vNext - v) >> SCANLINE_SUBDIVISION_BITS; // vIncrement
+        interp0->base[0] = *(uvCacheOut++) = (uNext - u) >> SCANLINE_SUBDIVISION_BITS; // uIncrement
+        interp0->base[1] = *(uvCacheOut++) = (vNext - v) >> SCANLINE_SUBDIVISION_BITS; // vIncrement
 
 
         //*(from++) = texture[(textureXFixedPoint >> UV_FRACTIONAL_BITS) +

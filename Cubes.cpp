@@ -17,9 +17,14 @@ Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
         }
     }
     addCube(Point3DInt(-2, -2, 5), DIRT);
+//    addCube(Point3DInt(-2, -2, 5), DIRT);
+    addCube(Point3DInt(-1, -2, 5), DIRT);
+    addCube(Point3DInt(0, -2, 5), DIRT);
+    addCube(Point3DInt(1, -2, 5), DIRT);
+    addCube(Point3DInt(2, -2, 5), DIRT);
     addCube(Point3DInt(-2, -2, 6), DIRT);
     addCube(Point3DInt(-2, -2, 7), DIRT);
-    
+
     //addCube(Point3DInt(0, 0, 4), GRASS);
     //addCube(Point3DInt(1, 0, 4), DIRT);
 
@@ -93,14 +98,21 @@ void Cubes::update() {
                     face == FACE_TOP ? GRASS_TOP_TEXTURE :
                     face == FACE_BOTTOM ? DIRT_TEXTURE : GRASS_SIDE_TEXTURE :
                     DIRT_TEXTURE;
+                textureFill->uvCache = NULL;
                 cube.cachedShapes[face] = faceShape = ConvexShape::create(4, 4, textureFill);
             }
 
             rasterizer->shapes.push_back(faceShape);
-            Point2D point = projectCubeFace(cube, (CubeFace)face);
+            int maxWidth;
+            Point2D point = projectCubeFace(cube, (CubeFace)face, maxWidth);
             computeZUVMatrix(cube, (CubeFace)face,
                              *reinterpret_cast<TextureFill*>(faceShape->fill),
                              point);
+
+            TextureFill* textureFill = reinterpret_cast<TextureFill*>(faceShape->fill);
+            if (textureFill->uvCache)
+                delete textureFill->uvCache;
+            textureFill->uvCache = (int*) malloc(8 * ((maxWidth + 7) / 8));
         }
     }
 
@@ -138,7 +150,7 @@ Point3D FACE_CENTER_OFFSETS[] = {
     /* EAST */ Point3D(1, 0.5, 0.5),
 };
 
-Point2D Cubes::projectCubeFace(Cube& cube, CubeFace face) {
+Point2D Cubes::projectCubeFace(Cube& cube, CubeFace face, int& maxWidth) {
     // kamera pozíció és forgás alapján eliminálni lehetne a sortot
 
     Point2D points[4] = {
@@ -176,6 +188,9 @@ printf("projected points: %d,%d; %d,%d; %d,%d; %d,%d\n",
 );
 */
 
+    int minX = std::min(std::min((int)points[0].x, (int)points[1].x), std::min((int)points[2].x, (int)points[3].x));
+    int maxX = std::max(std::max((int)points[0].x, (int)points[1].x), std::max((int)points[2].x, (int)points[3].x));
+    maxWidth = maxX - minX;
 
     std::array<Point2D, 4> leftPoints, rightPoints;
 
