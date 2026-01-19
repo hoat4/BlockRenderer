@@ -82,19 +82,26 @@ const int MAX_TEXTURE_ROW_BITS = 5;
 const int SCANLINE_SUBDIVISION_BITS = 3;
 const int SCANLINE_SUBDIVISION = 1 << SCANLINE_SUBDIVISION_BITS;
 
+// mintha kicsit gyorsabb lenne így megfordítva, de nem biztos
+const int INTERPOLATOR_LANE_U = 1;
+const int INTERPOLATOR_LANE_V = 0;
+
 void TextureFill::initInterpolator() {
     interp_config cfg = interp_default_config();
     // set add_raw flag to use raw (un-shifted and un-masked) lane accumulator value when adding
     // it to the lane base to make the lane result
     interp_config_set_add_raw(&cfg, true);
-    interp_config_set_shift(&cfg, UV_FRACTIONAL_BITS - 1);
+    interp_config_set_shift(&cfg, UV_FRACTIONAL_BITS + SCANLINE_SUBDIVISION_BITS - 1);
     interp_config_set_mask(&cfg, 1, TEXTURE_SIZE_BITS - 1 + 1);
-    interp_set_config(interp0, 0, &cfg);
+    interp_set_config(interp0, INTERPOLATOR_LANE_U, &cfg);
 
-    interp_config_set_shift(&cfg, UV_FRACTIONAL_BITS - TEXTURE_SIZE_BITS - 1);
+    interp_config_set_shift(&cfg, UV_FRACTIONAL_BITS + SCANLINE_SUBDIVISION_BITS - TEXTURE_SIZE_BITS - 1);
     interp_config_set_mask(&cfg, TEXTURE_SIZE_BITS + 1, TEXTURE_SIZE_BITS + MAX_TEXTURE_ROW_BITS - 1 + 1);
-    interp_set_config(interp0, 1, &cfg);
+    interp_set_config(interp0, INTERPOLATOR_LANE_V, &cfg);
 }
+
+// valamiért gyorsabb, ha egy ilyen mutable változóba rakjuk bele ezt a konstanst
+io_rw_32* INTERP0_BASE = interp0->base;
 
 void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
                                                 int x2, int y2) {
@@ -110,42 +117,45 @@ void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
     int u = __usat((int)(uPerZValue * z), (UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS));
     int v = __usat((int)(vPerZValue * z), (UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS));
 
-    //printf("v: %d, orig v: %d\n", v, (int)(vPerZValue * z));
     // ez az if már felesleges, mert usat miatt nem lehetséges ilyen (ami nem feltétlen jó,
     // mert a tényleges se tudjuk így kiszűrni)
+    /*
     if (u < 0 || u >= TEXTURE_SIZE << UV_FRACTIONAL_BITS || v < 0 || v >= TEXTURE_SIZE << UV_FRACTIONAL_BITS) {
         printf("u: %d, v: %d, original pos: (%d, %d), base: (%f, %f)\n", u, v, x2, y2, baseX, baseY);
         printf("1/z base: %f, value: %f\n", zReciprocal.base, zReciprocalValue);
         printf("v/z base: %f, value: %f\n", vPerZ.base, vPerZValue);
         throw "texture coordinates out of bounds (1)";
     }
+    */
 
+    
     interp0->base[2] = (uintptr_t)texture;
-    interp0->accum[0] = u;
-    interp0->accum[1] = v;
+    interp0->accum[INTERPOLATOR_LANE_U] = u << SCANLINE_SUBDIVISION_BITS;
+    interp0->accum[INTERPOLATOR_LANE_V] = v << SCANLINE_SUBDIVISION_BITS;
 
     zReciprocalValue += zReciprocal.by8X;
     float zNext = 1.0f / zReciprocalValue;
 
-    while (from < to) {
+    do {
+        // ld. "Scanline subdivision" itt: 
+        // https://www.lysator.liu.se/~mikaelk/doc/perspectivetexture/
+
         uPerZValue += uPerZ.by8X;
         vPerZValue += vPerZ.by8X;
 
         int uNext = __usat((int)(uPerZValue * zNext), UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS);
+        INTERP0_BASE[INTERPOLATOR_LANE_U] = uNext - u; // uIncrement
+        u = uNext; // azért nem a lenti ifbe, hogy felhasználhassa az uNext regiszterét később másra
+
         int vNext = __usat((int)(vPerZValue * zNext), UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS);
 
-        // ld. "Scanline subdivision" itt: 
-        // https://www.lysator.liu.se/~mikaelk/doc/perspectivetexture/
-
-        interp0->base[0] = (uNext - u) >> SCANLINE_SUBDIVISION_BITS; // uIncrement
-        interp0->base[1] = (vNext - v) >> SCANLINE_SUBDIVISION_BITS; // vIncrement
+        INTERP0_BASE[INTERPOLATOR_LANE_V] = vNext - v; // vIncrement
 
 
         //*(from++) = texture[(textureXFixedPoint >> UV_FRACTIONAL_BITS) +
         //        ((textureYFixedPoint >> UV_FRACTIONAL_BITS) << TEXTURE_SIZE_BITS)]
 
         if (to - from > 8) {
-            u = uNext;
             v = vNext;
             zReciprocalValue += zReciprocal.by8X;
             zNext = 1.0f / zReciprocalValue; // a lenti memóriaírásokkal párhuzamosan menjen ez az osztás
@@ -159,7 +169,7 @@ void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
         *(from++) = *(uint16_t*)interp0->pop[2];
         *(from++) = *(uint16_t*)interp0->pop[2];
         *(from++) = *(uint16_t*)interp0->pop[2];
-    }
+    } while (from < to);
 }
 
 std::string TextureFill::toString() {

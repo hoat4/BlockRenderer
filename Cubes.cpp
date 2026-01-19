@@ -16,8 +16,20 @@ Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
                 }
         }
     }
+    addCube(Point3DInt(-4, 2, 5), DIRT);
+    addCube(Point3DInt(-3, 2, 5), DIRT);
+    addCube(Point3DInt(-2, 2, 5), DIRT);
+    addCube(Point3DInt(-1, 2, 5), DIRT);
+    addCube(Point3DInt(0, 2, 5), DIRT);
+    addCube(Point3DInt(1, 2, 5), DIRT);
+//    addCube(Point3DInt(2, 2, 5), DIRT);
+
+    addCube(Point3DInt(-4, -2, 5), DIRT);
+    addCube(Point3DInt(-3, -2, 5), DIRT);
     addCube(Point3DInt(-2, -2, 5), DIRT);
     addCube(Point3DInt(-2, -2, 6), DIRT);
+    //addCube(Point3DInt(-1, -2, 5), DIRT);
+    //addCube(Point3DInt(0, -2, 5), DIRT);
     addCube(Point3DInt(-2, -2, 7), DIRT);
     
     //addCube(Point3DInt(0, 0, 4), GRASS);
