@@ -24,6 +24,21 @@ struct IntermediateVertex {
     float slope;
 };
 
+class ConvexShape;
+
+class ConvexShapeGroup {
+
+    friend class Rasterizer;
+
+public:
+    ConvexShapeGroup() {}
+
+    float zIndex;
+
+private:
+    std::vector<ConvexShape*> shapesInActiveList;
+};
+
 class ConvexShape {
 
     friend class Rasterizer;
@@ -39,10 +54,10 @@ class ConvexShape {
     float topLeftSlope;
     float topRightSlope;
 
-    float z;
-
 public: // Fill.fillSpan miatt
     Fill* fill; // törölve lesz ~ConvexShape-ben
+
+    ConvexShapeGroup* group;
 
 private:
     int maxIntermediateVertexCount;
@@ -54,8 +69,6 @@ private:
     ConvexShape* prevInActiveList;
     ConvexShape* nextInActiveList;
 
-    ConvexShape* prevInStack;
-
     /**
      * Rasterizer::processCurrentLine-ból használva
      */
@@ -65,6 +78,9 @@ private:
     float leftSlope;
     float rightX;
     float rightSlope;
+
+    int leftXInt;
+    int rightXInt;
 
     int minXFloor;
 
@@ -86,11 +102,10 @@ public:
     /**
      * Ezután a modifyPointsot meg kell hívni.
      */
-    static ConvexShape* create(int maxLeftPoints, int maxRightPoints,
+    static ConvexShape* create(ConvexShapeGroup* group, int maxLeftPoints, int maxRightPoints,
                                Fill* fill);
 
-    void modifyPoints(std::span<Point2D> leftPoints, std::span<Point2D> rightPoints,
-                      float z);
+    void modifyPoints(std::span<Point2D> leftPoints, std::span<Point2D> rightPoints);
 
     ~ConvexShape();
 

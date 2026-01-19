@@ -9,41 +9,72 @@ const bool TRACE_UV_MATRICES = 0;
 Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
     //addCube(Point3DInt(2, 0, 3), GRASS);
     for (int x = -4; x <= 3; x++) {
-        for (int y = -2; y <= 2; y++) {
-            if (y % 2 == 0)
-                for (int z = 4; z <= 4; z++) {
-                    addCube(Point3DInt(x, y, z), x >= 0 ? GRASS : DIRT);
-                }
+        for (int z = 4; z <= 11; z++) {
+            addCube(Point3DInt(x, -3, z), GRASS);
         }
     }
-    addCube(Point3DInt(-4, 2, 5), DIRT);
-    addCube(Point3DInt(-3, 2, 5), DIRT);
-    addCube(Point3DInt(-2, 2, 5), DIRT);
-    addCube(Point3DInt(-1, 2, 5), DIRT);
-    addCube(Point3DInt(0, 2, 5), DIRT);
-    addCube(Point3DInt(1, 2, 5), DIRT);
-//    addCube(Point3DInt(2, 2, 5), DIRT);
 
-    addCube(Point3DInt(-4, -2, 5), DIRT);
-    addCube(Point3DInt(-3, -2, 5), DIRT);
-    addCube(Point3DInt(-2, -2, 5), DIRT);
-    addCube(Point3DInt(-2, -2, 6), DIRT);
-    //addCube(Point3DInt(-1, -2, 5), DIRT);
-    //addCube(Point3DInt(0, -2, 5), DIRT);
-    addCube(Point3DInt(-2, -2, 7), DIRT);
-    
+    addCube(Point3DInt(2, -2, 6), DIRT);
+    addCube(Point3DInt(-4, -2, 6), DIRT);
+    addCube(Point3DInt(-2, -2, 7), GRASS);
+    addCube(Point3DInt(-3, -2, 8), DIRT);
+    ///addCube(Point3DInt(2, -1, 6), DIRT);
+
+    //addCube(Point3DInt(-2, -2, 7), DIRT);
+
     //addCube(Point3DInt(0, 0, 4), GRASS);
     //addCube(Point3DInt(1, 0, 4), DIRT);
 
     frameID = 0;
 }
 
+Cube* Cubes::findByPos(Point3DInt p) {
+    for (Cube* cube : cubes) {
+        if (cube->pos == p)
+            return cube;
+    }
+    return NULL;
+}
+
+Point3DInt CUBE_NEIGHBOUR_OFFSETS[] = {
+    /* TOP */    Point3DInt(0, 1, 0),
+    /* BOTTOM */ Point3DInt(0, -1, 0),
+    /* NORTH */  Point3DInt(0, 0, 1),
+    /* WEST */   Point3DInt(-1, 0, 0),
+    /* SOUTH */  Point3DInt(0, 0, -1),
+    /* EAST */   Point3DInt(1, 0, 0),
+};
+
 void Cubes::addCube(Point3DInt p, CubeType type) {
-    cubes.push_back({
+    if (findByPos(p))
+        throw "already exists";
+
+    Cube* neighbours[6] = { NULL, NULL, NULL, NULL, NULL, NULL };
+    for (int face = 0; face < 6; face++)
+        neighbours[face] = findByPos(p + CUBE_NEIGHBOUR_OFFSETS[face]);
+
+    Cube* c = new Cube{
         .pos = p,
         .type = type,
         .updatedAtFrame = 0,
-        .cachedShapes = {NULL, NULL, NULL, NULL, NULL, NULL} });
+        .cachedShapes = {NULL, NULL, NULL, NULL, NULL, NULL},
+        .convexShapeGroup = new ConvexShapeGroup(),
+        .neighbours = {neighbours[0], neighbours[1], neighbours[2], neighbours[3], neighbours[4], neighbours[5] }
+    };
+    cubes.push_back(c);
+
+    if (neighbours[FACE_TOP])
+        neighbours[FACE_TOP]->neighbours[FACE_BOTTOM] = c;
+    if (neighbours[FACE_BOTTOM])
+        neighbours[FACE_BOTTOM]->neighbours[FACE_TOP] = c;
+    if (neighbours[FACE_NORTH])
+        neighbours[FACE_NORTH]->neighbours[FACE_SOUTH] = c;
+    if (neighbours[FACE_SOUTH])
+        neighbours[FACE_SOUTH]->neighbours[FACE_NORTH] = c;
+    if (neighbours[FACE_WEST])
+        neighbours[FACE_WEST]->neighbours[FACE_EAST] = c;
+    if (neighbours[FACE_EAST])
+        neighbours[FACE_EAST]->neighbours[FACE_WEST] = c;
 }
 
 void Cubes::update() {
@@ -59,36 +90,37 @@ void Cubes::update() {
     rasterizer->shapes.erase(rasterizer->shapes.begin(), rasterizer->shapes.end());
 
     for (auto it = cubes.begin(); it != cubes.end(); ++it) {
-        Cube& cube = *it;
+        Cube& cube = **it;
         cube.updatedAtFrame = frameID;
+
+        Point3D cubeCenter = cube.pos + Point3D(0.5, 0.5, 0.5);
+        cube.convexShapeGroup->zIndex = -Point3D::distanceSq(cubeCenter, cameraPos);
+
         for (int face = 0; face < 6; face++) {
-            Color faceColor;
             bool faceVisible;
-            switch (face) {
-            case FACE_TOP:
-                faceColor = 0xFFFF5555;
-                faceVisible = cameraPos.y > cube.pos.y + 1;
-                break;
-            case FACE_BOTTOM:
-                faceColor = 0xFFFF00FF;
-                faceVisible = cameraPos.y < cube.pos.y;
-                break;
-            case FACE_NORTH:
-                faceColor = 0xFFAA5500;
+            if (cube.neighbours[face])
                 faceVisible = false;
-                break;
-            case FACE_WEST:
-                faceColor = 0xFF00FF00;
-                faceVisible = cameraPos.x < cube.pos.x;
-                break;
-            case FACE_EAST:
-                faceColor = 0xFF0000FF;
-                faceVisible = cameraPos.x > cube.pos.x + 1;
-                break;
-            case FACE_SOUTH:
-                faceColor = 0xFFFFFF00;
-                faceVisible = true;
-                break;
+            else {
+                switch (face) {
+                case FACE_TOP:
+                    faceVisible = cameraPos.y > cube.pos.y + 1;
+                    break;
+                case FACE_BOTTOM:
+                    faceVisible = cameraPos.y < cube.pos.y;
+                    break;
+                case FACE_NORTH:
+                    faceVisible = false;
+                    break;
+                case FACE_WEST:
+                    faceVisible = cameraPos.x < cube.pos.x;
+                    break;
+                case FACE_EAST:
+                    faceVisible = cameraPos.x > cube.pos.x + 1;
+                    break;
+                case FACE_SOUTH:
+                    faceVisible = true;
+                    break;
+                }
             }
             if (!faceVisible) {
                 if (cube.cachedShapes[face]) {
@@ -105,7 +137,8 @@ void Cubes::update() {
                     face == FACE_TOP ? GRASS_TOP_TEXTURE :
                     face == FACE_BOTTOM ? DIRT_TEXTURE : GRASS_SIDE_TEXTURE :
                     DIRT_TEXTURE;
-                cube.cachedShapes[face] = faceShape = ConvexShape::create(4, 4, textureFill);
+                cube.cachedShapes[face] = faceShape = ConvexShape::create(
+                    cube.convexShapeGroup, 4, 4, textureFill);
             }
 
             rasterizer->shapes.push_back(faceShape);
@@ -117,7 +150,7 @@ void Cubes::update() {
     }
 
     for (auto it = cubes.begin(); it != cubes.end(); ++it) {
-        Cube& t = *it;
+        Cube& t = *(*it);
         if (t.updatedAtFrame != frameID && t.updatedAtFrame != 0) {
             for (int face = 0; face < 6; face++) {
                 delete t.cachedShapes[face];
@@ -140,14 +173,6 @@ Point3DInt CUBE_VERTEX_OFFSETS[] = {
     /* WEST */   Point3DInt(0, 1, 1), Point3DInt(0, 1, 0), Point3DInt(0, 0, 1), Point3DInt(0, 0, 0),
     /* SOUTH */  Point3DInt(0, 1, 0), Point3DInt(1, 1, 0), Point3DInt(0, 0, 0), Point3DInt(1, 0, 0),
     /* EAST */   Point3DInt(1, 1, 0), Point3DInt(1, 1, 1), Point3DInt(1, 0, 0), Point3DInt(1, 0, 1),
-};
-Point3D FACE_CENTER_OFFSETS[] = {
-    /* TOP */ Point3D(0.5, 1, 0.5),
-    /* BOTTOM */ Point3D(0.5, 0, 0.5),
-    /* NORTH */ Point3D(0.5, 0.5, 1),
-    /* WEST */ Point3D(0, 0.5, 0.5),
-    /* SOUTH */ Point3D(0.5, 0.5, 0),
-    /* EAST */ Point3D(1, 0.5, 0.5),
 };
 
 Point2D Cubes::projectCubeFace(Cube& cube, CubeFace face) {
@@ -210,13 +235,9 @@ printf("projected points: %d,%d; %d,%d; %d,%d; %d,%d\n",
     leftPoints[leftPointCount++] = points[3];
     rightPoints[rightPointCount++] = points[3];
 
-    Point3D faceCenter = cube.pos + FACE_CENTER_OFFSETS[face];
-    float zIndex = Point3D::distanceSq(faceCenter, cameraPos);
-
     cube.cachedShapes[face]->modifyPoints(
         std::span{ leftPoints }.subspan(0, leftPointCount),
-        std::span{ rightPoints }.subspan(0, rightPointCount),
-        -zIndex
+        std::span{ rightPoints }.subspan(0, rightPointCount)
     );
 
     return leftPoints[0];

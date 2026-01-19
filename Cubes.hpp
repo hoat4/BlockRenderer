@@ -21,9 +21,9 @@ struct Point3D {
 };
 
 struct Point3DInt {
-    int x;
-    int y;
-    int z;
+    const int x;
+    const int y;
+    const int z;
 
     Point3DInt(int x, int y, int z) : x(x), y(y), z(z) {}
 
@@ -33,6 +33,10 @@ struct Point3DInt {
 
     inline Point3D operator + (Point3D other) {
         return Point3D(x + other.x, y + other.y, z + other.z);
+    }
+
+    inline bool operator == (Point3DInt other) {
+        return x == other.x && y == other.y && z == other.z;
     }
 };
 
@@ -57,7 +61,7 @@ struct ZUV {
 };
 
 class Cubes : public Scene {
-    std::vector<Cube> cubes;
+    std::vector<Cube*> cubes;
     uint64_t frameID;
     Point3D cameraPos;
     float aspectRatio;
@@ -67,6 +71,7 @@ class Cubes : public Scene {
     void update();
 
     private:
+    Cube* findByPos(Point3DInt pos);
     void addCube(Point3DInt pos, CubeType type);
 
     /** 
@@ -85,4 +90,8 @@ struct Cube {
 
     uint64_t updatedAtFrame;
     ConvexShape* cachedShapes[6];
+
+    ConvexShapeGroup* convexShapeGroup;
+
+    Cube* neighbours[6];
 };

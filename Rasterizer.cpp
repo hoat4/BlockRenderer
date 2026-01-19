@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <memory>
 #include <math.h>
+#include <algorithm>
 
 #include <pico/stdlib.h> // get_absolute_time
 
@@ -36,8 +37,8 @@ void Rasterizer::beginFrame() {
         s->nextInTopRow = shapeListsByLine[s->top];
         s->prevInActiveList = NULL;
         s->nextInActiveList = NULL;
-        s->prevInStack = NULL;
         shapeListsByLine[s->top] = s;
+        s->group->shapesInActiveList.clear();
     }
 
     activeShapes = NULL;
@@ -82,7 +83,7 @@ void Rasterizer::addToActiveList(ConvexShape* shapeToAdd) {
         printf("Before addToActiveList: ");
         printActiveShapes();
         printf("Add %s at %f-%f (z-index: %f)\n", shapeToAdd->fill->toString().c_str(),
-               shapeToAdd->leftX, shapeToAdd->rightX, shapeToAdd->z);
+               shapeToAdd->leftX, shapeToAdd->rightX, shapeToAdd->group->zIndex);
     }
     ConvexShape* addAfter = NULL;
     for (ConvexShape* shape = activeShapes; shape && shouldBeAfterInActiveShapeList(shapeToAdd, shape); shape = shape->nextInActiveList) {
@@ -91,17 +92,29 @@ void Rasterizer::addToActiveList(ConvexShape* shapeToAdd) {
     if (addAfter == shapeToAdd)
         throw "shape already in active list";
     if (!addAfter) {
+        if (TRACE_CHANGE_ACTIVE_LIST || TRACE_FILLS)
+            printf("Add %s at active list begin\n", shapeToAdd->fill->toString().c_str());
         shapeToAdd->prevInActiveList = NULL;
         shapeToAdd->nextInActiveList = activeShapes;
         if (activeShapes)
             activeShapes->prevInActiveList = shapeToAdd;
         activeShapes = shapeToAdd;
     } else {
+        if (TRACE_CHANGE_ACTIVE_LIST || TRACE_FILLS)
+            printf("Add %s after %s\n", shapeToAdd->fill->toString().c_str(), addAfter->fill->toString().c_str());
         shapeToAdd->prevInActiveList = addAfter;
         shapeToAdd->nextInActiveList = addAfter->nextInActiveList;
         addAfter->nextInActiveList = shapeToAdd;
         if (shapeToAdd->nextInActiveList)
             shapeToAdd->nextInActiveList->prevInActiveList = shapeToAdd;
+    }
+
+    shapeToAdd->group->shapesInActiveList.push_back(shapeToAdd);
+
+    if (TRACE_CHANGE_ACTIVE_LIST || TRACE_FILLS) {
+        printf("After addToActiveList: ");
+        printActiveShapes();
+        printf("\n");
     }
 }
 
@@ -116,11 +129,27 @@ void Rasterizer::removeFromActiveList(ConvexShape* shape) {
         shape->nextInActiveList->prevInActiveList = shape->prevInActiveList;
     shape->prevInActiveList = NULL;
     shape->nextInActiveList = NULL;
+
+    std::vector<ConvexShape*>::iterator pos = std::find(
+        shape->group->shapesInActiveList.begin(),
+        shape->group->shapesInActiveList.end(),
+        shape);
+    if (pos == shape->group->shapesInActiveList.end())
+        throw "not in shapesInActiveList of group";
+    shape->group->shapesInActiveList.erase(pos);
 }
 
 bool Rasterizer::shouldBeAfterInActiveShapeList(ConvexShape* shape, ConvexShape* other) {
-    int ax = (int)shape->leftX, bx = (int)other->leftX;
-    return ax > bx || ax == bx && shape->z < other->z;
+    int ax = shape->leftXInt, bx = other->leftXInt;
+    if (shape->group != other->group) {
+        if (shape->group->zIndex > other->group->zIndex)
+            for (ConvexShape* s : shape->group->shapesInActiveList)
+                ax = std::min(ax, s->leftXInt);
+        else
+            for (ConvexShape* s : other->group->shapesInActiveList)
+                bx = std::min(bx, s->leftXInt);
+    }
+    return ax > bx || ax == bx && shape->group->zIndex < other->group->zIndex;
 }
 
 void Rasterizer::shiftLeftInActiveList(ConvexShape* shape) {
@@ -147,7 +176,9 @@ void Rasterizer::processCurrentLine() {
         } else {
             if (!processBreaksOnCurrentLine(shape)) {
                 shape->leftX += shape->leftSlope;
+                shape->leftXInt = (int)shape->leftX;
                 shape->rightX += shape->rightSlope;
+                shape->rightXInt = (int)shape->rightX;
             }
             shiftLeftInActiveList(shape);
         }
@@ -160,26 +191,27 @@ void Rasterizer::processCurrentLine() {
 
         shape->leftX = shape->topLeftX;
         shape->leftSlope = shape->topLeftSlope;
+        shape->leftXInt = (int)shape->leftX;
         shape->rightX = shape->topRightX;
         shape->rightSlope = shape->topRightSlope;
-
-        addToActiveList(shape);
+        shape->rightXInt = (int)shape->rightX;
 
         processBreaksOnCurrentLine(shape);
-
-        shiftLeftInActiveList(shape);
+        addToActiveList(shape);
     }
 
     checkActiveShapes();
 }
 
 void Rasterizer::checkActiveShapes() {
+    if (true)return;
+    // TODO ezt aktualizálni kéne ConvexShapeGroup átalakítás óta
     ConvexShape* prevS = NULL;
     for (ConvexShape* shape = activeShapes; shape; shape = shape->nextInActiveList) {
-        if (prevS && ((int) shape->leftX < (int) prevS->leftX || shape->prevInActiveList != prevS ||
-                      (int)shape->leftX == (int)prevS->leftX && shape->z > prevS->z)) {
+        if (prevS && (shape->leftXInt < prevS->leftXInt || shape->prevInActiveList != prevS ||
+                      shape->leftXInt == prevS->leftXInt && shape->group->zIndex > prevS->group->zIndex)) {
             printActiveShapes();
-            printf("leftx: %f, %f\n", shape->leftX, prevS->leftX);
+            printf("leftx: %d, %d\n", shape->leftXInt, prevS->leftXInt);
             throw "wrong active shapes";
         }
         prevS = shape;
@@ -195,9 +227,11 @@ bool Rasterizer::processBreaksOnCurrentLine(ConvexShape* shape) {
         if (v.isLeft) {
             shape->leftX = v.x;
             shape->leftSlope = v.slope;
+            shape->leftXInt = (int)shape->leftX;
         } else {
             shape->rightX = v.x;
             shape->rightSlope = v.slope;
+            shape->rightXInt = (int)shape->rightX;
         }
 
         shape->nextIntermediateVertexIndex++;
@@ -209,7 +243,7 @@ bool Rasterizer::processBreaksOnCurrentLine(ConvexShape* shape) {
 void Rasterizer::printActiveShapes() {
     printf("Active shapes: ");
     for (ConvexShape* shape = activeShapes; shape; shape = shape->nextInActiveList) {
-        printf("%s at %f-%f (z-index %f), ", shape->fill->toString().c_str(), shape->leftX, shape->rightX, shape->z);
+        printf("%s at %d-%d (z-index %f), ", shape->fill->toString().c_str(), shape->leftXInt, shape->rightXInt, shape->group->zIndex);
     }
     printf("\n");
 }
@@ -226,18 +260,20 @@ void Rasterizer::renderSpans(uint16_t* buffer) {
 
     int prevX = 0;
     for (; shape; shape = shape->nextInActiveList) {
-        int shapeLeft = (int)shape->leftX;
-        int shapeRight = (int)shape->rightX;
+        int shapeLeft = shape->leftXInt;
+        int shapeRight = shape->rightXInt;
 
         int rightClip = shapeRight;
         ConvexShape* rightClipShape = NULL;
         for (ConvexShape* s = shape->nextInActiveList; s; s = s->nextInActiveList) {
-            int sLeft = (int)s->leftX;
+            int sLeft = s->leftXInt;
             if (sLeft == shapeLeft)
                 continue;
             if (sLeft >= shapeRight)
                 break;
-            if (s->z > shape->z && (!rightClipShape || s->z > rightClipShape->z && sLeft <= rightClip)) {
+            if (s->group->zIndex > shape->group->zIndex &&
+                (!rightClipShape || s->group->zIndex > rightClipShape->group->zIndex &&
+                 sLeft <= rightClip)) {
                 rightClipShape = s;
                 rightClip = sLeft;
             }
@@ -283,12 +319,15 @@ ConvexShape* ConvexShape::create(
     float z,
     Fill* fill) {
 
-    ConvexShape* shape = create(leftPoints.size(), rightPoints.size(), fill);
-    shape->modifyPoints(leftPoints, rightPoints, z);
+    ConvexShapeGroup* group = new ConvexShapeGroup();
+    group->zIndex = z;
+    ConvexShape* shape = create(group, leftPoints.size(), rightPoints.size(), fill);
+    shape->modifyPoints(leftPoints, rightPoints);
     return shape;
 }
 
 ConvexShape* ConvexShape::create(
+    ConvexShapeGroup* group,
     int maxLeftVertexCount, int maxRightVertexCount,
     Fill* fill) {
 
@@ -302,12 +341,12 @@ ConvexShape* ConvexShape::create(
     // unique_ptr.reset megpróbálná törölni a memóriaszemetet
     shape->fill = fill;
     shape->maxIntermediateVertexCount = maxIntermediatePointCount;
+    shape->group = group;
 
     return shape;
 }
 
-void ConvexShape::modifyPoints(std::span<Point2D> leftPoints, std::span<Point2D> rightPoints,
-                               float z) {
+void ConvexShape::modifyPoints(std::span<Point2D> leftPoints, std::span<Point2D> rightPoints) {
     if (leftPoints.size() < 2 || rightPoints.size() < 2)
         throw "too few points";
     if (leftPoints[0].y != rightPoints[0].y)
@@ -322,7 +361,6 @@ void ConvexShape::modifyPoints(std::span<Point2D> leftPoints, std::span<Point2D>
 
     this->top = (int)std::floor(leftPoints.front().y);
     this->bottom = (int)std::ceil(leftPoints.back().y);
-    this->z = z;
 
     if (top == bottom)
         // felesleges kiszámolni a pontokat, mert beginFrame úgyis ignorálni fogja ezt a shapeet
