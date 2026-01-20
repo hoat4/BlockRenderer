@@ -152,12 +152,13 @@ DVIDisplay::DVIDisplay(const Pinout pinout) : pinout(pinout) {
     vactive_line_header[6] |= timingMode.h_active_pixels;
 
     const int frame_pixel_words = (frame_width * h_repeat * line_bytes_per_pixel + 3) >> 2;
-    frame_line_words = frame_pixel_words + count_of(vactive_line_header);
-    line_buffers = (uint32_t*)malloc(frame_line_words * 4 * LINE_BUFFER_COUNT);
+    frame_line_words_without_padding = frame_pixel_words + count_of(vactive_line_header);
+    frame_line_words_with_padding = frame_line_words_without_padding + sizeof(int) * VACTIVE_LINE_END_PADDING_IN_WORDS;
+    line_buffers = (uint32_t*)malloc(frame_line_words_with_padding * 4 * LINE_BUFFER_COUNT);
     
     for (int i = 0; i < LINE_BUFFER_COUNT; ++i)
     {
-        memcpy(&line_buffers[i * frame_line_words], vactive_line_header, count_of(vactive_line_header) * sizeof(uint32_t));
+        memcpy(&line_buffers[i * frame_line_words_with_padding], vactive_line_header, count_of(vactive_line_header) * sizeof(uint32_t));
     }
 
     
@@ -316,8 +317,8 @@ void DVIDisplay::handleInterrupt() {
         const int y = v_scanline - v_inactive_total;
         const int new_line_num = y % LINE_BUFFER_COUNT;
 
-        ch->read_addr = (uintptr_t)&line_buffers[new_line_num * frame_line_words];
-        ch->transfer_count = frame_line_words;
+        ch->read_addr = (uintptr_t)&line_buffers[new_line_num * frame_line_words_with_padding];
+        ch->transfer_count = frame_line_words_without_padding;
 
         lineBuffers_minWriteable = (y + 1) % frame_height;
     }
@@ -388,7 +389,7 @@ LineBuffer DVIDisplay::nextLine() {
     l.display = this;
     l.lineNumber = toBeWritten;
     l.buffer = (uint16_t*) &line_buffers[
-        (l.lineNumber % LINE_BUFFER_COUNT) * frame_line_words + count_of(vactive_line_header)];
+        (l.lineNumber % LINE_BUFFER_COUNT) * frame_line_words_with_padding + count_of(vactive_line_header)];
     return l;
 }
 

@@ -142,6 +142,11 @@ private:
     uint32_t vblank_line_vsync_on[count_of(vblank_line_vsync_on_src)];
     uint32_t vactive_line_header[count_of(vactive_line_header_src)];
 
+    /**
+     * ennyivel szabad továbbírni a buffer vége után (a túlcsordult tartalom ignormálva lesz)
+     */
+    const unsigned int VACTIVE_LINE_END_PADDING_IN_WORDS = 4; 
+
     static const int LINE_BUFFER_COUNT = 10;
 
 private: 
@@ -152,7 +157,8 @@ private:
     unsigned int ch_num = 0;
     int v_inactive_total;
     int v_total_active_lines;
-    unsigned int frame_line_words;
+    unsigned int frame_line_words_without_padding;
+    unsigned int frame_line_words_with_padding;
 
     volatile int v_scanline = 2;
     volatile uint lineBuffers_write = 0;
