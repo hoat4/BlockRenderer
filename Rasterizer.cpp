@@ -198,6 +198,15 @@ void Rasterizer::processCurrentLine() {
 
         processBreaksOnCurrentLine(shape);
         addToActiveList(shape);
+
+        // lehet hogy egy jobbra lévő grouptársa már be lett rakva activeListbe. ilyenkor megváltozik
+        // a group leftX-je, így az eddig jobbra lévőt lehet hogy balrább kell tolni, a most újonnan berakott shapehez.
+        // lehet hogy jobb lenne, ha az egy groupban lévőket fordított sorrendben kerülnének be shapeListsByLine[y]-be, 
+        // mert akkor nem kéne ez a ciklus.
+        for (ConvexShape* s : shape->group->shapesInActiveList) {
+            if (s->top == shape->top)
+                shiftLeftInActiveList(s);
+        }
     }
 
     checkActiveShapes();

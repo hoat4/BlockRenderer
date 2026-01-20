@@ -19,17 +19,16 @@ Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
             addCube(Point3DInt(x, -3, z), GRASS);
         }
     }
+    for (int x = -5; x <= 7; x++) {
+        for (int y = -2; y <= 5; y++) {
+            addCube(Point3DInt(x, y, 11), DIRT);
+        }
+    }
 
     addCube(Point3DInt(2, -2, 6), DIRT);
     addCube(Point3DInt(-4, -2, 6), DIRT);
     addCube(Point3DInt(-2, -2, 7), GRASS);
     addCube(Point3DInt(-3, -2, 8), DIRT);
-    ///addCube(Point3DInt(2, -1, 6), DIRT);
-
-    //addCube(Point3DInt(-2, -2, 7), DIRT);
-
-    //addCube(Point3DInt(0, 0, 4), GRASS);
-    //addCube(Point3DInt(1, 0, 4), DIRT);
 
     frameID = 0;
 }
