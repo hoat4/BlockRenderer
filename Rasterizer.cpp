@@ -253,7 +253,7 @@ void Rasterizer::renderSpans(uint16_t* buffer) {
         printActiveShapes();
     }
 
-    TextureFill::initInterpolator();
+    PerspectiveTextureFill::initInterpolator();
 
     // TODO right<=0-eket kiszűrni
     ConvexShape* shape = activeShapes;

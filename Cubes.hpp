@@ -13,9 +13,9 @@ struct Point3D {
     Point3D(float x, float y, float z) : x(x), y(y), z(z) {}
 
     inline static float distanceSq(Point3D a, Point3D b) {
-        float dx = a.x-b.x;
-        float dy = a.y-b.y;
-        float dz = a.z-b.z;
+        float dx = a.x - b.x;
+        float dy = a.y - b.y;
+        float dz = a.z - b.z;
         return dx * dx + dy * dy + dz * dz; // FMA?
     }
 };
@@ -42,11 +42,11 @@ struct Point3DInt {
 
 // sorrend CUBE_VERTEX_OFFSETS-ben is van használva
 enum CubeFace {
-    FACE_TOP, 
-    FACE_BOTTOM, 
+    FACE_TOP,
+    FACE_BOTTOM,
     FACE_NORTH,
-    FACE_WEST,  
-    FACE_SOUTH, 
+    FACE_WEST,
+    FACE_SOUTH,
     FACE_EAST
 };
 
@@ -58,6 +58,8 @@ struct ZUV {
     float zReciprocal;
     float uPerZ;
     float vPerZ;
+    float u;
+    float v;
 };
 
 class Cubes : public Scene {
@@ -66,20 +68,20 @@ class Cubes : public Scene {
     Point3D cameraPos;
     float aspectRatio;
 
-    public:
+public:
     Cubes();
     void update();
 
-    private:
+private:
     Cube* findByPos(Point3DInt pos);
     void addCube(Point3DInt pos, CubeType type);
 
-    /** 
-     * visszaad egy tetszőleges pontot, ami a kockán van
-     */
-    Point2D projectCubeFace(Cube& cube, CubeFace face);
+    void setCubeFaceVertices(Cube& cube, CubeFace face, std::array<Point2D, 4> points);
     ZUV computeZUV(Cube& cube, CubeFace face, float x, float y);
-    void computeZUVMatrix(Cube& cube, CubeFace face, TextureFill& textureFill, Point2D origin);
+    void computeZUVMatrix(Cube& cube, CubeFace face, PerspectiveTextureFill& textureFill,
+                          Point2D origin);
+    void computeUVMatrix(Cube& cube, CubeFace face, InterpolatedTextureFill& textureFill,
+                         std::array<Point2D, 4> points);
     Point2D projectPoint(Point3DInt p);
 };
 

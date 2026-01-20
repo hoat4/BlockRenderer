@@ -14,6 +14,12 @@ Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
         }
     }
 
+    for (int x = 5; x <= 7; x++) {
+        for (int z = 9; z <= 11; z++) {
+            addCube(Point3DInt(x, -3, z), GRASS);
+        }
+    }
+
     addCube(Point3DInt(2, -2, 6), DIRT);
     addCube(Point3DInt(-4, -2, 6), DIRT);
     addCube(Point3DInt(-2, -2, 7), GRASS);
@@ -77,6 +83,20 @@ void Cubes::addCube(Point3DInt p, CubeType type) {
         neighbours[FACE_EAST]->neighbours[FACE_WEST] = c;
 }
 
+// sorrend (computeUVMatrix-nak kell): 
+// - 0.: textúra bal felül
+// - 1.: textúra jobb felül
+// - 2.: textúra bal alul
+// - 3.: textúra jobb alul
+Point3DInt CUBE_VERTEX_OFFSETS[] = {
+    /* TOP */    Point3DInt(0, 1, 1), Point3DInt(1, 1, 1), Point3DInt(0, 1, 0), Point3DInt(1, 1, 0),
+    /* BOTTOM */ Point3DInt(0, 0, 0), Point3DInt(1, 0, 0), Point3DInt(0, 0, 1), Point3DInt(1, 0, 1),
+    /* NORTH */  Point3DInt(1, 1, 1), Point3DInt(0, 1, 1), Point3DInt(1, 0, 1), Point3DInt(0, 0, 1),
+    /* WEST */   Point3DInt(0, 1, 1), Point3DInt(0, 1, 0), Point3DInt(0, 0, 1), Point3DInt(0, 0, 0),
+    /* SOUTH */  Point3DInt(0, 1, 0), Point3DInt(1, 1, 0), Point3DInt(0, 0, 0), Point3DInt(1, 0, 0),
+    /* EAST */   Point3DInt(1, 1, 0), Point3DInt(1, 1, 1), Point3DInt(1, 0, 0), Point3DInt(1, 0, 1),
+};
+
 void Cubes::update() {
     if (frameID == 0) {
         printf("create bg\n");
@@ -130,22 +150,49 @@ void Cubes::update() {
                 continue;
             }
 
+            bool interpolatedTexture = cube.pos.z >= 9; // TODO kamera forgatását figyelembe kell itt majd venni
             ConvexShape* faceShape = cube.cachedShapes[face];
             if (faceShape == NULL) {
-                TextureFill* textureFill = new TextureFill();
-                textureFill->texture = cube.type == GRASS ?
+                const uint16_t* texture = cube.type == GRASS ?
                     face == FACE_TOP ? GRASS_TOP_TEXTURE :
                     face == FACE_BOTTOM ? DIRT_TEXTURE : GRASS_SIDE_TEXTURE :
                     DIRT_TEXTURE;
+
+                Fill* fill;
+
+                if (interpolatedTexture) {
+                    InterpolatedTextureFill* textureFill = new InterpolatedTextureFill();
+                    textureFill->texture = texture;
+                    fill = textureFill;
+                } else {
+                    PerspectiveTextureFill* textureFill = new PerspectiveTextureFill();
+                    textureFill->texture = texture;
+                    fill = textureFill;
+                }
+
                 cube.cachedShapes[face] = faceShape = ConvexShape::create(
-                    cube.convexShapeGroup, 4, 4, textureFill);
+                    cube.convexShapeGroup, 4, 4, fill);
             }
 
+            std::array<Point2D, 4> projectedPoints = {
+                projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4]),
+                projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 1]),
+                projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 2]),
+                projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 3])
+            };
+
             rasterizer->shapes.push_back(faceShape);
-            Point2D point = projectCubeFace(cube, (CubeFace)face);
-            computeZUVMatrix(cube, (CubeFace)face,
-                             *reinterpret_cast<TextureFill*>(faceShape->fill),
-                             point);
+            setCubeFaceVertices(cube, (CubeFace)face, projectedPoints);
+
+            if (interpolatedTexture) {
+                computeUVMatrix(cube, (CubeFace)face,
+                                *reinterpret_cast<InterpolatedTextureFill*>(faceShape->fill),
+                                projectedPoints);
+            } else {
+                computeZUVMatrix(cube, (CubeFace)face,
+                                 *reinterpret_cast<PerspectiveTextureFill*>(faceShape->fill),
+                                 projectedPoints[0]);
+            }
         }
     }
 
@@ -161,29 +208,8 @@ void Cubes::update() {
     }
 }
 
-// sorrend: 
-// - 0.: textúra bal felül
-// - 1.: textúra jobb felül
-// - 2.: textúra bal alul
-// - 3.: textúra jobb alul (valójában mindegy, de úgyis csak az maradt)
-Point3DInt CUBE_VERTEX_OFFSETS[] = {
-    /* TOP */    Point3DInt(0, 1, 1), Point3DInt(1, 1, 1), Point3DInt(0, 1, 0), Point3DInt(1, 1, 0),
-    /* BOTTOM */ Point3DInt(0, 0, 0), Point3DInt(1, 0, 0), Point3DInt(0, 0, 1), Point3DInt(1, 0, 1),
-    /* NORTH */  Point3DInt(1, 1, 1), Point3DInt(0, 1, 1), Point3DInt(1, 0, 1), Point3DInt(0, 0, 1),
-    /* WEST */   Point3DInt(0, 1, 1), Point3DInt(0, 1, 0), Point3DInt(0, 0, 1), Point3DInt(0, 0, 0),
-    /* SOUTH */  Point3DInt(0, 1, 0), Point3DInt(1, 1, 0), Point3DInt(0, 0, 0), Point3DInt(1, 0, 0),
-    /* EAST */   Point3DInt(1, 1, 0), Point3DInt(1, 1, 1), Point3DInt(1, 0, 0), Point3DInt(1, 0, 1),
-};
-
-Point2D Cubes::projectCubeFace(Cube& cube, CubeFace face) {
+void Cubes::setCubeFaceVertices(Cube& cube, CubeFace face, std::array<Point2D, 4> points) {
     // kamera pozíció és forgás alapján eliminálni lehetne a sortot
-
-    Point2D points[4] = {
-        projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4]),
-        projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 1]),
-        projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 2]),
-        projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 3])
-    };
 
     //printf("uAtLeftTop:%d, uByX: %d\n",
     //       textureFill.uAtLeftTop.floor(), textureFill.uByX.floor());           
@@ -239,8 +265,6 @@ printf("projected points: %d,%d; %d,%d; %d,%d; %d,%d\n",
         std::span{ leftPoints }.subspan(0, leftPointCount),
         std::span{ rightPoints }.subspan(0, rightPointCount)
     );
-
-    return leftPoints[0];
 }
 
 Point2D Cubes::projectPoint(Point3DInt p) {
@@ -255,9 +279,12 @@ Point2D Cubes::projectPoint(Point3DInt p) {
     };
 }
 
-void Cubes::computeZUVMatrix(Cube& cube, CubeFace face, TextureFill& textureFill, Point2D p) {
+void Cubes::computeZUVMatrix(Cube& cube, CubeFace face, PerspectiveTextureFill& textureFill, Point2D p) {
     // "1/z, u/z and v/z are linear in screen space": 
     // https://www.lysator.liu.se/~mikaelk/doc/perspectivetexture/
+
+    // itt írják hogy hogyan lehet kiszámolni egyszerűbben 1/z,u/z,v/z változását:
+    // https://flipcode.com/archives/The_Art_of_Demomaking-Issue_14_Perspective_Correct_Texture_Mapping.shtml
 
     int pixelStepRight = 8;
 
@@ -349,12 +376,75 @@ ZUV Cubes::computeZUV(Cube& cube, CubeFace face, float x, float y) {
     u = u * 16;
     v = v * 16;
 
-    u *= 1 << TextureFill::UV_FRACTIONAL_BITS;
-    v *= 1 << TextureFill::UV_FRACTIONAL_BITS;
+    u *= 1 << PerspectiveTextureFill::UV_FRACTIONAL_BITS;
+    v *= 1 << PerspectiveTextureFill::UV_FRACTIONAL_BITS;
 
     return {
         .zReciprocal = 1 / z,
         .uPerZ = u / z,
-        .vPerZ = v / z
+        .vPerZ = v / z,
+        .u = u,
+        .v = v
     };
+}
+
+
+void Cubes::computeUVMatrix(Cube& cube, CubeFace face, InterpolatedTextureFill& textureFill,
+                            std::array<Point2D, 4> points) {
+
+    textureFill.baseX = std::floor(points[0].x);
+    textureFill.baseY = std::floor(points[0].y);
+
+    Point2D pointAtTextureRightTop = {
+        .x = std::floor(points[1].x) - textureFill.baseX,
+        .y = std::floor(points[1].y) - textureFill.baseY
+    };
+
+    Point2D pointAtTextureLeftBottom = {
+        .x = std::floor(points[2].x) - textureFill.baseX,
+        .y = std::floor(points[2].y) - textureFill.baseY
+    };
+
+    Point2D pointAtTextureRightBottom = {
+        .x = std::floor(points[3].x) - textureFill.baseX,
+        .y = std::floor(points[3].y) - textureFill.baseY
+    };
+
+    float m00 = (pointAtTextureRightTop.x) / 15.0f;
+    float m01 = (pointAtTextureLeftBottom.x) / 15.0f;
+    float m10 = (pointAtTextureRightTop.y) / 15.0f;
+    float m11 = (pointAtTextureLeftBottom.y) / 15.0f;
+    float detInv = 1 / (m00 * m11 - m01 * m10);
+
+    float im00 = m11 * detInv;
+    float im10 = -m10 * detInv;
+    float im01 = -m01 * detInv;
+    float im11 = m00 * detInv;
+
+    textureFill.uByX = im00 * (1 << InterpolatedTextureFill::UV_FRACTIONAL_BITS);
+    textureFill.vByX = im10 * (1 << InterpolatedTextureFill::UV_FRACTIONAL_BITS);
+    textureFill.uByY = im01 * (1 << InterpolatedTextureFill::UV_FRACTIONAL_BITS);
+    textureFill.vByY = im11 * (1 << InterpolatedTextureFill::UV_FRACTIONAL_BITS);
+
+    // TODO ha rightBottom esetén megnő 16 fölé U vagy V, akkor csökkenteni kéne a mátrix értékeit
+
+    /*
+    printf("Unproject (base at %d, %d): \n", textureFill.baseX, textureFill.baseY);
+    printf("- (%f, %f): (%f, %f)\n", pointAtTextureRightTop.x, pointAtTextureRightTop.y,
+           (textureFill.uByX * pointAtTextureRightTop.x +
+           textureFill.uByY * pointAtTextureRightTop.y) / (1 << InterpolatedTextureFill::UV_FRACTIONAL_BITS),
+           (textureFill.vByX * pointAtTextureRightTop.x +
+           textureFill.vByY * pointAtTextureRightTop.y) / (1 << InterpolatedTextureFill::UV_FRACTIONAL_BITS));
+    printf("- (%f, %f): (%f, %f)\n", pointAtTextureLeftBottom.x, pointAtTextureLeftBottom.y,
+           (textureFill.uByX * pointAtTextureLeftBottom.x +
+           textureFill.uByY * pointAtTextureLeftBottom.y) / (1 << InterpolatedTextureFill::UV_FRACTIONAL_BITS),
+           (textureFill.vByX * pointAtTextureLeftBottom.x +
+           textureFill.vByY * pointAtTextureLeftBottom.y) / (1 << InterpolatedTextureFill::UV_FRACTIONAL_BITS));
+    printf("- (%f, %f): (%f, %f)\n", pointAtTextureRightBottom.x, pointAtTextureRightBottom.y,
+           (textureFill.uByX * pointAtTextureRightBottom.x +
+           textureFill.uByY * pointAtTextureRightBottom.y) / (1 << InterpolatedTextureFill::UV_FRACTIONAL_BITS),
+           (textureFill.vByX * pointAtTextureRightBottom.x +
+           textureFill.vByY * pointAtTextureRightBottom.y) / (1 << InterpolatedTextureFill::UV_FRACTIONAL_BITS));
+    printf("\n");
+    */
 }

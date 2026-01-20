@@ -39,7 +39,7 @@ private:
 
 struct LerpableData {
     /**
-     * Value at screen left top (0, 0)
+     * Value at PerspectiveTextureFill.baseX/Y
      */
     float base;
     float byX;
@@ -52,9 +52,10 @@ struct LerpableData {
 };
 
 /**
- * 16x16-os méret, átlátszóság nélkül
+ * 16x16-os méret, átlátszóság nélkül. Nem valódi perspektíva, mert csak 8px-enként van inverz projekció végrehajtva,
+ * azok között lineáris interpoláció van (emiatt 8px-nél keskenyef).
  */
-class TextureFill : public Fill {
+class PerspectiveTextureFill : public Fill {
 
 public:
     const uint16_t* texture;
@@ -64,7 +65,7 @@ public:
     LerpableData uPerZ;
     LerpableData vPerZ;
 
-    TextureFill() {}
+    PerspectiveTextureFill() {}
 
     static void initInterpolator();
 
@@ -73,4 +74,52 @@ public:
     virtual std::string toString();
 
     static const int UV_FRACTIONAL_BITS = 12;
+    static const int SCANLINE_SUBDIVISION_BITS = 3;
+    // PerspectiveTextureFillnek nem kell padding mert van benne __usat, 
+    // de InterpolatedTextureFillben viszont igen
+
+private:
+    static const int MAX_TEXTURE_ROW_BITS = 5;
+    static const int SCANLINE_SUBDIVISION = 1 << SCANLINE_SUBDIVISION_BITS;
+};
+
+
+struct LerpableDataInt {
+
+    /**
+     * Value at InterpolatedTextureFill.baseX/Y
+     */
+    int base;
+    int byX;
+    int byY;
+
+    int valueAt(int x, int y) {
+        return base + x * byX + y * byY;
+    }
+};
+
+/**
+ * 16x16-os méret, átlátszóság nélkül. Nem valódi perspektíva, hanem 8px-enként van újraszámolva.
+ */
+class InterpolatedTextureFill : public Fill {
+
+public:
+    const uint16_t* texture;
+
+    int baseX;
+    int baseY;
+    int uByX;
+    int uByY;
+    int vByX;
+    int vByY;
+    
+    InterpolatedTextureFill() {}
+
+    virtual void fillSpan(uint16_t* from, uint16_t* to,
+                          int x, int y);
+    virtual std::string toString();
+
+    static const int UV_FRACTIONAL_BITS =
+        PerspectiveTextureFill::UV_FRACTIONAL_BITS +
+        PerspectiveTextureFill::SCANLINE_SUBDIVISION_BITS;
 };

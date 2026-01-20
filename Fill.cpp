@@ -5,6 +5,9 @@
 #include "hardware/dma.h"
 #include "arm_acle.h"
 
+// méret konstansok miatt
+#include "textures.hpp"
+
 int dmaChannel;
 dma_channel_config dmaChannelConfig;
 int dmaBuffer;
@@ -75,18 +78,13 @@ Color ColorFill::blendColorsDstOpaque(Color dst, Color src) {
     return 0xFF000000 | (ro & 0xFF00) << 8 | (go & 0xFF00) | bo >> 8;
 }
 
-// először volt külön TEXTURE_STRIDE is mert __usat helyett padding volt, de __usat miatt muszáj kettő-hatványnak lennie a textúraméretnek
-const int TEXTURE_SIZE_BITS = 4;
-const int TEXTURE_SIZE = 1 << TEXTURE_SIZE_BITS;
-const int MAX_TEXTURE_ROW_BITS = 5;
-const int SCANLINE_SUBDIVISION_BITS = 3;
-const int SCANLINE_SUBDIVISION = 1 << SCANLINE_SUBDIVISION_BITS;
+
 
 // mintha kicsit gyorsabb lenne így megfordítva, de nem biztos
 const int INTERPOLATOR_LANE_U = 1;
 const int INTERPOLATOR_LANE_V = 0;
 
-void TextureFill::initInterpolator() {
+void PerspectiveTextureFill::initInterpolator() {
     interp_config cfg = interp_default_config();
     // set add_raw flag to use raw (un-shifted and un-masked) lane accumulator value when adding
     // it to the lane base to make the lane result
@@ -95,16 +93,16 @@ void TextureFill::initInterpolator() {
     interp_config_set_mask(&cfg, 1, TEXTURE_SIZE_BITS - 1 + 1);
     interp_set_config(interp0, INTERPOLATOR_LANE_U, &cfg);
 
-    interp_config_set_shift(&cfg, UV_FRACTIONAL_BITS + SCANLINE_SUBDIVISION_BITS - TEXTURE_SIZE_BITS - 1);
-    interp_config_set_mask(&cfg, TEXTURE_SIZE_BITS + 1, TEXTURE_SIZE_BITS + MAX_TEXTURE_ROW_BITS - 1 + 1);
+    interp_config_set_shift(&cfg, UV_FRACTIONAL_BITS + SCANLINE_SUBDIVISION_BITS - TEXTURE_STRIDE_BITS - 1);
+    interp_config_set_mask(&cfg, TEXTURE_STRIDE_BITS + 1, TEXTURE_STRIDE_BITS + MAX_TEXTURE_ROW_BITS - 1 + 1);
     interp_set_config(interp0, INTERPOLATOR_LANE_V, &cfg);
 }
 
 // valamiért gyorsabb, ha egy ilyen mutable változóba rakjuk bele ezt a konstanst
 io_rw_32* INTERP0_BASE = interp0->base;
 
-void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
-                                                int x2, int y2) {
+void __not_in_flash_func(PerspectiveTextureFill::fillSpan)(uint16_t* from, uint16_t* to,
+                                                           int x2, int y2) {
     float x = x2 - baseX;
     float y = y2 - baseY;
 
@@ -128,7 +126,7 @@ void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
     }
     */
 
-    
+
     interp0->base[2] = (uintptr_t)texture;
     interp0->accum[INTERPOLATOR_LANE_U] = u << SCANLINE_SUBDIVISION_BITS;
     interp0->accum[INTERPOLATOR_LANE_V] = v << SCANLINE_SUBDIVISION_BITS;
@@ -172,9 +170,50 @@ void __not_in_flash_func(TextureFill::fillSpan)(uint16_t* from, uint16_t* to,
     } while (from < to);
 }
 
-std::string TextureFill::toString() {
+std::string PerspectiveTextureFill::toString() {
     std::stringstream s;
-    s << "0x" << std::hex << texture;
+    s << "PerspectiveTextureFill 0x" << std::hex << texture;
     return s.str();
 }
 
+
+
+void __not_in_flash_func(InterpolatedTextureFill::fillSpan)(uint16_t* from, uint16_t* to,
+                                                            int x2, int y2) {
+    int x = x2 - baseX;
+    int y = y2 - baseY;
+
+    int u1 = uByX * x + uByY * y;
+    int v1 = vByX * x + vByY * y;
+
+    /*
+    if (u1 < 0 || u1 >= TEXTURE_SIZE << UV_FRACTIONAL_BITS ||
+        v1 < 0 || v1 >= TEXTURE_SIZE << UV_FRACTIONAL_BITS) {
+        printf("u: %d, v: %d, original pos: (%d, %d), base: (%d, %d)\n", u1, v1, x2, y2, baseX, baseY);
+        throw "texture coordinates out of bounds (3)";
+    }
+        */
+
+    interp0->accum[INTERPOLATOR_LANE_U] = u1;
+    interp0->accum[INTERPOLATOR_LANE_V] = v1;
+    INTERP0_BASE[INTERPOLATOR_LANE_U] = uByX;
+    INTERP0_BASE[INTERPOLATOR_LANE_V] = vByX;
+    INTERP0_BASE[2] = (uintptr_t)texture;
+
+    do {
+        *(from++) = *(uint16_t*)interp0->pop[2];
+        *(from++) = *(uint16_t*)interp0->pop[2];
+        *(from++) = *(uint16_t*)interp0->pop[2];
+        *(from++) = *(uint16_t*)interp0->pop[2];
+        *(from++) = *(uint16_t*)interp0->pop[2];
+        *(from++) = *(uint16_t*)interp0->pop[2];
+        *(from++) = *(uint16_t*)interp0->pop[2];
+        *(from++) = *(uint16_t*)interp0->pop[2];
+    } while (from < to);
+}
+
+std::string InterpolatedTextureFill::toString() {
+    std::stringstream s;
+    s << "InterpolatedTextureFill 0x" << std::hex << texture;
+    return s.str();
+}
