@@ -33,6 +33,7 @@ void main(String[] args) throws Throwable {
     processFile("dirt.png", "DIRT_TEXTURE");
     processFile("grass_side.png", "GRASS_SIDE_TEXTURE");
     processFile("grass_top.png", "GRASS_TOP_TEXTURE");
+    processFile("planks_oak.png", "OAK_PLANKS_TEXTURE");
 
     Files.writeString(Path.of("textures.cpp"), out.toString());
     Files.writeString(Path.of("textures.hpp"), hppOut.toString());
@@ -41,7 +42,7 @@ void main(String[] args) throws Throwable {
 void processFile(String filename, String variableName) throws Throwable {
     out.append("\n");
 
-    img = ImageIO.read(new File(filename));
+    img = ImageIO.read(new File("textures/" + filename));
     if (img.getWidth() != 16 || img.getHeight() != 16)
         throw new RuntimeException("wrong image size");
 

@@ -137,17 +137,17 @@ void Rasterizer::removeFromActiveList(ConvexShape* shape) {
     if (pos == shape->group->shapesInActiveList.end())
         throw "not in shapesInActiveList of group";
     shape->group->shapesInActiveList.erase(pos);
+    shape->group->refreshLeftX();
 }
 
 bool Rasterizer::shouldBeAfterInActiveShapeList(ConvexShape* shape, ConvexShape* other) {
     int ax = shape->leftXInt, bx = other->leftXInt;
     if (shape->group != other->group) {
+        // lehet hogy a groupnak még nem tagja a shape, ezért kell std::min
         if (shape->group->zIndex > other->group->zIndex)
-            for (ConvexShape* s : shape->group->shapesInActiveList)
-                ax = std::min(ax, s->leftXInt);
+            ax = std::min(ax, shape->group->leftXInt);
         else
-            for (ConvexShape* s : other->group->shapesInActiveList)
-                bx = std::min(bx, s->leftXInt);
+            bx = std::min(bx, other->group->leftXInt);
     }
     return ax > bx || ax == bx && shape->group->zIndex < other->group->zIndex;
 }
@@ -179,6 +179,7 @@ void Rasterizer::processCurrentLine() {
                 shape->leftXInt = (int)shape->leftX;
                 shape->rightX += shape->rightSlope;
                 shape->rightXInt = (int)shape->rightX;
+                shape->group->refreshLeftX();
             }
             shiftLeftInActiveList(shape);
         }
@@ -198,6 +199,7 @@ void Rasterizer::processCurrentLine() {
 
         processBreaksOnCurrentLine(shape);
         addToActiveList(shape);
+        shape->group->refreshLeftX();
 
         // lehet hogy egy jobbra lévő grouptársa már be lett rakva activeListbe. ilyenkor megváltozik
         // a group leftX-je, így az eddig jobbra lévőt lehet hogy balrább kell tolni, a most újonnan berakott shapehez.
@@ -237,6 +239,7 @@ bool Rasterizer::processBreaksOnCurrentLine(ConvexShape* shape) {
             shape->leftX = v.x;
             shape->leftSlope = v.slope;
             shape->leftXInt = (int)shape->leftX;
+            shape->group->refreshLeftX();
         } else {
             shape->rightX = v.x;
             shape->rightSlope = v.slope;
@@ -407,4 +410,11 @@ void ConvexShape::modifyPoints(std::span<Point2D> leftPoints, std::span<Point2D>
 
 ConvexShape::~ConvexShape() {
     delete fill;
+}
+
+void ConvexShapeGroup::refreshLeftX() {
+    int min = std::numeric_limits<int>::max();
+    for (ConvexShape* s : shapesInActiveList)
+        min = std::min(min, s->leftXInt);
+    leftXInt = min;
 }

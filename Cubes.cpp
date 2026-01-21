@@ -10,25 +10,30 @@ Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
     //addCube(Point3DInt(2, 0, 3), GRASS);
     for (int x = -5; x <= 4; x++) {
         for (int z = 4; z <= 11; z++) {
-            addCube(Point3DInt(x, -3, z), GRASS);
+            addCube(Point3DInt(x, -4, z), GRASS);
         }
     }
 
     for (int x = 5; x <= 7; x++) {
         for (int z = 9; z <= 11; z++) {
-            addCube(Point3DInt(x, -3, z), GRASS);
+            addCube(Point3DInt(x, -4, z), GRASS);
         }
     }
-    for (int x = -5; x <= 7; x++) {
-        for (int y = -2; y <= 5; y++) {
-            addCube(Point3DInt(x, y, 11), DIRT);
+    for (int x = -5; x <= -3; x++) {
+        for (int y = -3; y <= -1; y++) {
+            addCube(Point3DInt(x, y, 11), OAK_PLANKS);
+        }
+    }
+    for (int z = 12; z <= 13; z++) {
+        for (int y = -3; y <= -1; y++) {
+            addCube(Point3DInt(-3, y, z), OAK_PLANKS);
         }
     }
 
-    addCube(Point3DInt(2, -2, 6), DIRT);
-    addCube(Point3DInt(-4, -2, 6), DIRT);
-    addCube(Point3DInt(-2, -2, 7), GRASS);
-    addCube(Point3DInt(-3, -2, 8), DIRT);
+    addCube(Point3DInt(2, -3, 6), DIRT);
+    addCube(Point3DInt(-4, -3, 6), DIRT);
+    addCube(Point3DInt(-2, -3, 7), GRASS);
+    addCube(Point3DInt(-3, -3, 8), DIRT);
 
     frameID = 0;
 }
@@ -155,6 +160,7 @@ void Cubes::update() {
                 const uint16_t* texture = cube.type == GRASS ?
                     face == FACE_TOP ? GRASS_TOP_TEXTURE :
                     face == FACE_BOTTOM ? DIRT_TEXTURE : GRASS_SIDE_TEXTURE :
+                    cube.type == OAK_PLANKS ? OAK_PLANKS_TEXTURE : 
                     DIRT_TEXTURE;
 
                 Fill* fill;
@@ -409,10 +415,10 @@ void Cubes::computeUVMatrix(Cube& cube, CubeFace face, InterpolatedTextureFill& 
         .y = std::floor(points[3].y) - textureFill.baseY
     };
 
-    float m00 = (pointAtTextureRightTop.x) / 15.0f;
-    float m01 = (pointAtTextureLeftBottom.x) / 15.0f;
-    float m10 = (pointAtTextureRightTop.y) / 15.0f;
-    float m11 = (pointAtTextureLeftBottom.y) / 15.0f;
+    float m00 = pointAtTextureRightTop.x / 16.0f;
+    float m01 = pointAtTextureLeftBottom.x / 16.0f;
+    float m10 = pointAtTextureRightTop.y / 16.0f;
+    float m11 = pointAtTextureLeftBottom.y / 16.0f;
     float detInv = 1 / (m00 * m11 - m01 * m10);
 
     float im00 = m11 * detInv;

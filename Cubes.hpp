@@ -51,7 +51,7 @@ enum CubeFace {
 };
 
 enum CubeType {
-    DIRT, GRASS
+    DIRT, GRASS, OAK_PLANKS
 };
 
 struct ZUV {

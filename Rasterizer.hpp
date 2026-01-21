@@ -34,6 +34,9 @@ public:
     ConvexShapeGroup() {}
 
     float zIndex;
+    int leftXInt;
+
+    void refreshLeftX();
 
 private:
     std::vector<ConvexShape*> shapesInActiveList;
@@ -42,6 +45,7 @@ private:
 class ConvexShape {
 
     friend class Rasterizer;
+    friend class ConvexShapeGroup;
 
     int top;
     /**
