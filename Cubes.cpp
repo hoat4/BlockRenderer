@@ -9,7 +9,7 @@ const bool TRACE_UV_MATRICES = 0;
 Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
     //addCube(Point3DInt(2, 0, 3), GRASS);
     for (int x = -6; x <= 4; x++) {
-        for (int z = 4; z <= 11; z++) {
+        for (int z = 4; z <= 20; z++) {
             addCube(Point3DInt(x, -4, z), GRASS);
         }
     }
@@ -121,8 +121,10 @@ void Cubes::update() {
         cube.updatedAtFrame = frameID;
 
         Point3D cubeCenter = cube.pos + Point3D(0.5, 0.5, 0.5);
+        Point2D projectedCubeCenter = projectPoint(cubeCenter);
         cube.convexShapeGroup->zIndex = -Point3D::distanceSq(cubeCenter, cameraPos);
-
+        cube.convexShapeGroup->x = projectedCubeCenter.x;
+        cube.convexShapeGroup->y = projectedCubeCenter.x;
         for (int face = 0; face < 6; face++) {
             bool faceVisible;
             if (cube.neighbours[face])
@@ -175,10 +177,10 @@ void Cubes::update() {
             }
 
             std::array<Point2D, 4> projectedPoints = {
-                projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4]),
-                projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 1]),
-                projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 2]),
-                projectPoint(cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 3])
+                projectPoint((cube.pos + CUBE_VERTEX_OFFSETS[face * 4]).toFloat()),
+                projectPoint((cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 1]).toFloat()),
+                projectPoint((cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 2]).toFloat()),
+                projectPoint((cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 3]).toFloat())
             };
 
             rasterizer->shapes.push_back(faceShape);
@@ -267,7 +269,7 @@ printf("projected points: %d,%d; %d,%d; %d,%d; %d,%d\n",
     );
 }
 
-Point2D Cubes::projectPoint(Point3DInt p) {
+Point2D Cubes::projectPoint(Point3D p) {
     //printf("project point %d,%d\n", p.x, p.y);
     float x = p.x * rasterizer->screenWidth() / 2.0f;
     float y = p.y * rasterizer->screenHeight() / 2.0f * aspectRatio;

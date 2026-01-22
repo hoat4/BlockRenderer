@@ -28,20 +28,11 @@ struct IntermediateVertex {
 
 class ConvexShape;
 
-class ConvexShapeGroup {
-
-    friend class Rasterizer;
-
-public:
-    ConvexShapeGroup() {}
+struct ConvexShapeGroup {
 
     float zIndex;
-    int leftXInt;
-
-    void refreshLeftX();
-
-private:
-    std::vector<ConvexShape*> shapesInActiveList;
+    float x;
+    float y; // ez valójában nincs is használva
 };
 
 class ConvexShape {

@@ -35,6 +35,10 @@ struct Point3DInt {
         return Point3D(x + other.x, y + other.y, z + other.z);
     }
 
+    inline Point3D toFloat() {
+        return Point3D(x, y, z);
+    }
+
     inline bool operator == (Point3DInt other) {
         return x == other.x && y == other.y && z == other.z;
     }
@@ -82,7 +86,7 @@ private:
                           Point2D origin);
     void computeUVMatrix(Cube& cube, CubeFace face, InterpolatedTextureMapping& textureFill,
                          std::array<Point2D, 4> points);
-    Point2D projectPoint(Point3DInt p);
+    Point2D projectPoint(Point3D p);
 };
 
 struct Cube {

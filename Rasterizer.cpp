@@ -69,7 +69,6 @@ void Rasterizer::beginFrame() {
         s->prevInActiveList = NULL;
         s->nextInActiveList = NULL;
         shapeListsByLine[s->top] = s;
-        s->group->shapesInActiveList.clear();
     }
 
     activeShapes = NULL;
@@ -111,14 +110,11 @@ void Rasterizer::waitForLineFinish() {
 
 void Rasterizer::addToActiveList(ConvexShape* shapeToAdd) {
     if (TRACE_CHANGE_ACTIVE_LIST || TRACE_FILLS) {
-        printf("Before addToActiveList: ");
-        printActiveShapes();
         printf("Add %s at %f-%f (z-index: %f)\n", shapeToAdd->fill->toString().c_str(),
                shapeToAdd->leftX, shapeToAdd->rightX, shapeToAdd->group->zIndex);
+        printf("Before addToActiveList: ");
+        printActiveShapes();
     }
-
-    // shouldBeAfterInActiveShapeList előtt kell beállítani
-    shapeToAdd->group->leftXInt = std::min(shapeToAdd->leftXInt, shapeToAdd->group->leftXInt);
 
     ConvexShape* addAfter = NULL;
     for (ConvexShape* shape = activeShapes; shape && shouldBeAfterInActiveShapeList(shapeToAdd, shape); shape = shape->nextInActiveList) {
@@ -128,7 +124,7 @@ void Rasterizer::addToActiveList(ConvexShape* shapeToAdd) {
         throw "shape already in active list";
     if (!addAfter) {
         if (TRACE_CHANGE_ACTIVE_LIST || TRACE_FILLS)
-            printf("Add %s at active list begin\n", shapeToAdd->fill->toString().c_str());
+            printf("Add at active list begin\n");
         shapeToAdd->prevInActiveList = NULL;
         shapeToAdd->nextInActiveList = activeShapes;
         if (activeShapes)
@@ -136,15 +132,13 @@ void Rasterizer::addToActiveList(ConvexShape* shapeToAdd) {
         activeShapes = shapeToAdd;
     } else {
         if (TRACE_CHANGE_ACTIVE_LIST || TRACE_FILLS)
-            printf("Add %s after %s\n", shapeToAdd->fill->toString().c_str(), addAfter->fill->toString().c_str());
+            printf("Add after %s at %f-%f\n", addAfter->fill->toString().c_str(), addAfter->leftX, addAfter->rightX);
         shapeToAdd->prevInActiveList = addAfter;
         shapeToAdd->nextInActiveList = addAfter->nextInActiveList;
         addAfter->nextInActiveList = shapeToAdd;
         if (shapeToAdd->nextInActiveList)
             shapeToAdd->nextInActiveList->prevInActiveList = shapeToAdd;
     }
-
-    shapeToAdd->group->shapesInActiveList.push_back(shapeToAdd);
 
     if (TRACE_CHANGE_ACTIVE_LIST || TRACE_FILLS) {
         printf("After addToActiveList: ");
@@ -164,28 +158,60 @@ void Rasterizer::removeFromActiveList(ConvexShape* shape) {
         shape->nextInActiveList->prevInActiveList = shape->prevInActiveList;
     shape->prevInActiveList = NULL;
     shape->nextInActiveList = NULL;
-
-    std::vector<ConvexShape*>::iterator pos = std::find(
-        shape->group->shapesInActiveList.begin(),
-        shape->group->shapesInActiveList.end(),
-        shape);
-    if (pos == shape->group->shapesInActiveList.end())
-        throw "not in shapesInActiveList of group";
-    shape->group->shapesInActiveList.erase(pos);
-    shape->group->refreshLeftX();
 }
 
-bool Rasterizer::shouldBeAfterInActiveShapeList(ConvexShape* shape, ConvexShape* other) {
-    int ax = shape->leftXInt, bx = other->leftXInt;
-    if (shape->group != other->group) {
-        // lehet hogy a groupnak még nem tagja a shape, de a group->leftXInt már frissítve lett
-        // mire meghívódik ez a függvény
-        if (shape->group->zIndex > other->group->zIndex)
-            ax = shape->group->leftXInt;
-        else
-            bx = other->group->leftXInt;
+/**
+ * ha megfordul a és b, akkor az ellentétjét adja vissza (kivéve ha
+ * left, right és z is megegyezik, mert akkor nem lehet eldönteni)
+ */
+bool Rasterizer::shouldBeAfterInActiveShapeList(ConvexShape* a, ConvexShape* b) {
+    int aLeft = a->leftXInt, bLeft = b->leftXInt;
+    int aRight = a->rightXInt, bRight = b->rightXInt;
+    float az = a->group->zIndex, bz = b->group->zIndex;
+
+    if (aLeft == bLeft) {
+        if (az == bz) // ilyen esettel még nem találkoztam
+            return aRight > bRight;
+
+        return az < bz;
     }
-    return ax > bx || ax == bx && shape->group->zIndex < other->group->zIndex;
+
+    bool firstIsA = false, firstIsB = true;
+    if (aLeft > bLeft) {
+        aLeft = b->leftXInt, bLeft = a->leftXInt;
+        aRight = b->rightXInt, bRight = a->rightXInt;
+        az = b->group->zIndex, bz = a->group->zIndex;
+        ConvexShape* c = a;
+        a = b;
+        b = c;
+        firstIsA = true;
+        firstIsB = false;
+    }
+
+    // A bal oldala balra van B-től
+
+    if (az > bz)
+        // ha A B előtt van és balra is van B-től tőle, akkor nyilván A lesz előbb a listában.
+        return firstIsA;
+
+    if (az < bz) {
+        if (aRight > bRight) {
+            // A B mögött van, de kilóg tőle balra és jobbra is
+
+            if (a->group->x < b->group->x)
+                // A-nak a jobb oldali kilógása nem látszódhat, csak a bal (de az se biztosan)
+                return firstIsA;
+            else
+                // A-nak a bal oldali kilógása nem látszódhat, csak a jobb (de az se biztosan)
+                return firstIsB;
+        } else {
+            // A-nak csak bal oldali kilógása van B mögött
+            return firstIsA;
+        }
+    }
+
+    // az == bz
+    return firstIsA; // mindegy
 }
 
 void Rasterizer::shiftLeftInActiveList(ConvexShape* shape) {
@@ -215,7 +241,6 @@ void __not_in_flash_func(Rasterizer::processCurrentLine)() {
                 shape->leftXInt = (int)shape->leftX;
                 shape->rightX += shape->rightSlope;
                 shape->rightXInt = (int)shape->rightX;
-                shape->group->refreshLeftX();
             }
             shiftLeftInActiveList(shape);
         }
@@ -235,15 +260,6 @@ void __not_in_flash_func(Rasterizer::processCurrentLine)() {
 
         processBreaksOnCurrentLine(shape);
         addToActiveList(shape);
-
-        // lehet hogy egy jobbra lévő grouptársa már be lett rakva activeListbe. ilyenkor megváltozik
-        // a group leftX-je, így az eddig jobbra lévőt lehet hogy balrább kell tolni, a most újonnan berakott shapehez.
-        // lehet hogy jobb lenne, ha az egy groupban lévőket fordított sorrendben kerülnének be shapeListsByLine[y]-be, 
-        // mert akkor nem kéne ez a ciklus.
-        for (ConvexShape* s : shape->group->shapesInActiveList) {
-            if (s->top == shape->top)
-                shiftLeftInActiveList(s);
-        }
     }
 
     checkActiveShapes();
@@ -277,7 +293,6 @@ bool Rasterizer::processBreaksOnCurrentLine(ConvexShape* shape) {
         shape->leftX = v->x;
         shape->leftSlope = v->slope;
         shape->leftXInt = (int)shape->leftX;
-        shape->group->refreshLeftX();
     } else {
         shape->rightX = v->x;
         shape->rightSlope = v->slope;
@@ -290,7 +305,10 @@ bool Rasterizer::processBreaksOnCurrentLine(ConvexShape* shape) {
 void Rasterizer::printActiveShapes() {
     printf("Active shapes: ");
     for (ConvexShape* shape = activeShapes; shape; shape = shape->nextInActiveList) {
-        printf("%s at %d-%d (z-index %f), ", shape->fill->toString().c_str(), shape->leftXInt, shape->rightXInt, shape->group->zIndex);
+        printf("%s at %d-%d (group: z=%f, x=%f), ",
+               shape->fill->toString().c_str(),
+               shape->leftXInt, shape->rightXInt,
+               shape->group->zIndex, shape->group->x);
     }
     printf("\n");
 }
@@ -457,8 +475,8 @@ void Rasterizer::fillWithPerspectiveTexture(Fill* fill,
 
 
 void Rasterizer::fillWithInterpolatedTexture(Fill* fill,
-                                            uint16_t* from, uint16_t* to,
-                                            int x2, int y2) {
+                                             uint16_t* from, uint16_t* to,
+                                             int x2, int y2) {
     InterpolatedTextureMapping& m = fill->textureMapping.interpolated;
     int x = x2 - m.baseX;
     int y = y2 - m.baseY;
@@ -586,11 +604,4 @@ void ConvexShape::modifyPoints(std::span<Point2D> leftPoints, std::span<Point2D>
 
 ConvexShape::~ConvexShape() {
     delete fill;
-}
-
-void ConvexShapeGroup::refreshLeftX() {
-    int min = std::numeric_limits<int>::max();
-    for (ConvexShape* s : shapesInActiveList)
-        min = std::min(min, s->leftXInt);
-    leftXInt = min;
 }
