@@ -161,57 +161,29 @@ void Rasterizer::removeFromActiveList(ConvexShape* shape) {
 }
 
 /**
- * ha megfordul a és b, akkor az ellentétjét adja vissza (kivéve ha
- * left, right és z is megegyezik, mert akkor nem lehet eldönteni)
+ * ha megfordul a és b, akkor az ellentétjét adja vissza (kivéve ha nem lehet
+ * eldönteni hogy melyik van balra és jobbra)
  */
 bool Rasterizer::shouldBeAfterInActiveShapeList(ConvexShape* a, ConvexShape* b) {
     int aLeft = a->leftXInt, bLeft = b->leftXInt;
-    int aRight = a->rightXInt, bRight = b->rightXInt;
     float az = a->group->zIndex, bz = b->group->zIndex;
 
     if (aLeft == bLeft) {
-        if (az == bz) // ilyen esettel még nem találkoztam
-            return aRight > bRight;
-
         return az < bz;
     }
 
-    bool firstIsA = false, firstIsB = true;
-    if (aLeft > bLeft) {
-        aLeft = b->leftXInt, bLeft = a->leftXInt;
-        aRight = b->rightXInt, bRight = a->rightXInt;
-        az = b->group->zIndex, bz = a->group->zIndex;
-        ConvexShape* c = a;
-        a = b;
-        b = c;
-        firstIsA = true;
-        firstIsB = false;
+
+    if (aLeft < bLeft) {
+        // A bal oldala balra van B-től.
+        // Csak akkor kell megcserélni a két shapeet, ha A B mögött van, 
+        // de kilóg tőle balra és jobbra is, de a kilógás bal részéről tudjuk, hogy nem fog látszódni.
+        return az < bz && a->group->x > b->group->x;
+    } else {
+        // B bal oldala balra van A bal oldalától.
+        // Akkor kell így hagyni a sorrenet, ha B A mögött van, de kilóg
+        // tőle balra és jobbra is, viszont a kilógás bal részéről tudjuk, hogy nem fog látszódni.
+        return !(bz < az && b->group->x > a->group->x);
     }
-
-    // A bal oldala balra van B-től
-
-    if (az > bz)
-        // ha A B előtt van és balra is van B-től tőle, akkor nyilván A lesz előbb a listában.
-        return firstIsA;
-
-    if (az < bz) {
-        if (aRight > bRight) {
-            // A B mögött van, de kilóg tőle balra és jobbra is
-
-            if (a->group->x < b->group->x)
-                // A-nak a jobb oldali kilógása nem látszódhat, csak a bal (de az se biztosan)
-                return firstIsA;
-            else
-                // A-nak a bal oldali kilógása nem látszódhat, csak a jobb (de az se biztosan)
-                return firstIsB;
-        } else {
-            // A-nak csak bal oldali kilógása van B mögött
-            return firstIsA;
-        }
-    }
-
-    // az == bz
-    return firstIsA; // mindegy
 }
 
 void Rasterizer::shiftLeftInActiveList(ConvexShape* shape) {
