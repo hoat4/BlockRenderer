@@ -4,6 +4,8 @@
 #include "Fill.hpp"
 #include <memory>
 #include <span>
+#include "hardware/interp.h"
+#include "hardware/dma.h"
 
 class Fill;
 
@@ -64,19 +66,12 @@ public: // Fill.fillSpan miatt
     ConvexShapeGroup* group;
 
 private:
-    int maxIntermediateVertexCount;
-    int intermediateVertexCount;
 
     // Rasterizer::shapeListsByLine-ben használva
     ConvexShape* nextInTopRow;
 
     ConvexShape* prevInActiveList;
     ConvexShape* nextInActiveList;
-
-    /**
-     * Rasterizer::processCurrentLine-ból használva
-     */
-    int nextIntermediateVertexIndex;
 
     float leftX;
     float leftSlope;
@@ -88,10 +83,7 @@ private:
 
     int minXFloor;
 
-    /**
-     * Fentről lefele haladva.
-     */
-    IntermediateVertex intermediateVertices[];
+    IntermediateVertex intermediateVertices[2];
 
 public:
 
@@ -131,9 +123,16 @@ private:
     // 2. z
     ConvexShape* activeShapes;
 
+    int dmaChannel;
+    dma_channel_config dmaChannelConfig;
+    int dmaBuffer;
+
+    interp_config interpolatorLaneUConfig;
+    interp_config interpolatorLaneVConfig;
+
 public:
     std::vector<ConvexShape*> shapes;
-    Fill* background;
+    uint16_t background;
 
     Rasterizer(int width, int height);
 
@@ -148,6 +147,13 @@ public:
     int screenWidth();
     int screenHeight();
 
+    static const int PERSPECTIVE_UV_FRACTIONAL_BITS = 12;
+    static const int PERSPECTIVE_SCANLINE_SUBDIVISION_BITS = 3;
+    static const int PERSPECTIVE_SCANLINE_SUBDIVISION = 1 << PERSPECTIVE_SCANLINE_SUBDIVISION_BITS;
+    static const int INTERPOLATED_UV_FRACTIONAL_BITS =
+        PERSPECTIVE_UV_FRACTIONAL_BITS +
+        PERSPECTIVE_SCANLINE_SUBDIVISION_BITS;
+
 private:
     void addToActiveList(ConvexShape* shape);
     bool shouldBeAfterInActiveShapeList(ConvexShape* shape, ConvexShape* other);
@@ -157,6 +163,13 @@ private:
     void processCurrentLine();
     void checkActiveShapes();
     void printActiveShapes();
+    void initInterpolator();
     void renderSpans(uint16_t* buffer);
     void fillSpan(uint16_t* buffer, float from, float to);
+    void fillWithBackground(uint16_t* from, uint16_t* to);
+    static void fillWithPerspectiveTexture(Fill* texture,
+                                    uint16_t* from, uint16_t* to, int x2, int y2);
+    static void fillWithInterpolatedTexture(Fill* texture,
+                                     uint16_t* from, uint16_t* to, int x2, int y2);
+
 };

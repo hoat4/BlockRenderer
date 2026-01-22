@@ -8,7 +8,7 @@ const bool TRACE_UV_MATRICES = 0;
 
 Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
     //addCube(Point3DInt(2, 0, 3), GRASS);
-    for (int x = -5; x <= 4; x++) {
+    for (int x = -6; x <= 4; x++) {
         for (int z = 4; z <= 11; z++) {
             addCube(Point3DInt(x, -4, z), GRASS);
         }
@@ -106,7 +106,10 @@ void Cubes::update() {
         printf("create bg\n");
         aspectRatio = (float)rasterizer->screenWidth() / (float)rasterizer->screenHeight();
 
-        rasterizer->background = new ColorFill(0xFF55EEFF);
+        uint32_t color = 0xFF55EEFF;
+        unsigned int r = color >> 16 & 0xFF, g = color >> 8 & 0xFF, b = color & 0xFF;
+        rasterizer->background = ((r & 0b11111000) << 8) |
+            ((g & 0b11111100) << 3) | ((b & 0b11111000) >> 3);
     }
 
     frameID++;
@@ -160,20 +163,12 @@ void Cubes::update() {
                 const uint16_t* texture = cube.type == GRASS ?
                     face == FACE_TOP ? GRASS_TOP_TEXTURE :
                     face == FACE_BOTTOM ? DIRT_TEXTURE : GRASS_SIDE_TEXTURE :
-                    cube.type == OAK_PLANKS ? OAK_PLANKS_TEXTURE : 
+                    cube.type == OAK_PLANKS ? OAK_PLANKS_TEXTURE :
                     DIRT_TEXTURE;
 
-                Fill* fill;
-
-                if (interpolatedTexture) {
-                    InterpolatedTextureFill* textureFill = new InterpolatedTextureFill();
-                    textureFill->texture = texture;
-                    fill = textureFill;
-                } else {
-                    PerspectiveTextureFill* textureFill = new PerspectiveTextureFill();
-                    textureFill->texture = texture;
-                    fill = textureFill;
-                }
+                Fill* fill = new Fill();
+                fill->isInterpolated = interpolatedTexture;
+                fill->texture = texture;
 
                 cube.cachedShapes[face] = faceShape = ConvexShape::create(
                     cube.convexShapeGroup, 4, 4, fill);
@@ -191,11 +186,11 @@ void Cubes::update() {
 
             if (interpolatedTexture) {
                 computeUVMatrix(cube, (CubeFace)face,
-                                *reinterpret_cast<InterpolatedTextureFill*>(faceShape->fill),
+                                faceShape->fill->textureMapping.interpolated,
                                 projectedPoints);
             } else {
                 computeZUVMatrix(cube, (CubeFace)face,
-                                 *reinterpret_cast<PerspectiveTextureFill*>(faceShape->fill),
+                                 faceShape->fill->textureMapping.perspective,
                                  projectedPoints[0]);
             }
         }
@@ -284,7 +279,7 @@ Point2D Cubes::projectPoint(Point3DInt p) {
     };
 }
 
-void Cubes::computeZUVMatrix(Cube& cube, CubeFace face, PerspectiveTextureFill& textureFill, Point2D p) {
+void Cubes::computeZUVMatrix(Cube& cube, CubeFace face, PerspectiveTextureMapping& textureFill, Point2D p) {
     // "1/z, u/z and v/z are linear in screen space": 
     // https://www.lysator.liu.se/~mikaelk/doc/perspectivetexture/
 
@@ -381,8 +376,8 @@ ZUV Cubes::computeZUV(Cube& cube, CubeFace face, float x, float y) {
     u = u * 16;
     v = v * 16;
 
-    u *= 1 << PerspectiveTextureFill::UV_FRACTIONAL_BITS;
-    v *= 1 << PerspectiveTextureFill::UV_FRACTIONAL_BITS;
+    u *= 1 << Rasterizer::PERSPECTIVE_UV_FRACTIONAL_BITS;
+    v *= 1 << Rasterizer::PERSPECTIVE_UV_FRACTIONAL_BITS;
 
     return {
         .zReciprocal = 1 / z,
@@ -394,7 +389,8 @@ ZUV Cubes::computeZUV(Cube& cube, CubeFace face, float x, float y) {
 }
 
 
-void Cubes::computeUVMatrix(Cube& cube, CubeFace face, InterpolatedTextureFill& textureFill,
+void Cubes::computeUVMatrix(Cube& cube, CubeFace face,
+                            InterpolatedTextureMapping& textureFill,
                             std::array<Point2D, 4> points) {
 
     textureFill.baseX = std::floor(points[0].x);
@@ -426,10 +422,10 @@ void Cubes::computeUVMatrix(Cube& cube, CubeFace face, InterpolatedTextureFill& 
     float im01 = -m01 * detInv;
     float im11 = m00 * detInv;
 
-    textureFill.uByX = im00 * (1 << InterpolatedTextureFill::UV_FRACTIONAL_BITS);
-    textureFill.vByX = im10 * (1 << InterpolatedTextureFill::UV_FRACTIONAL_BITS);
-    textureFill.uByY = im01 * (1 << InterpolatedTextureFill::UV_FRACTIONAL_BITS);
-    textureFill.vByY = im11 * (1 << InterpolatedTextureFill::UV_FRACTIONAL_BITS);
+    textureFill.uByX = im00 * (1 << Rasterizer::INTERPOLATED_UV_FRACTIONAL_BITS);
+    textureFill.vByX = im10 * (1 << Rasterizer::INTERPOLATED_UV_FRACTIONAL_BITS);
+    textureFill.uByY = im01 * (1 << Rasterizer::INTERPOLATED_UV_FRACTIONAL_BITS);
+    textureFill.vByY = im11 * (1 << Rasterizer::INTERPOLATED_UV_FRACTIONAL_BITS);
 
     // TODO ha rightBottom esetén megnő 16 fölé U vagy V, akkor csökkenteni kéne a mátrix értékeit
 

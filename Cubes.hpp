@@ -78,9 +78,9 @@ private:
 
     void setCubeFaceVertices(Cube& cube, CubeFace face, std::array<Point2D, 4> points);
     ZUV computeZUV(Cube& cube, CubeFace face, float x, float y);
-    void computeZUVMatrix(Cube& cube, CubeFace face, PerspectiveTextureFill& textureFill,
+    void computeZUVMatrix(Cube& cube, CubeFace face, PerspectiveTextureMapping& textureFill,
                           Point2D origin);
-    void computeUVMatrix(Cube& cube, CubeFace face, InterpolatedTextureFill& textureFill,
+    void computeUVMatrix(Cube& cube, CubeFace face, InterpolatedTextureMapping& textureFill,
                          std::array<Point2D, 4> points);
     Point2D projectPoint(Point3DInt p);
 };
