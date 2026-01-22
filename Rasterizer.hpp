@@ -109,9 +109,7 @@ private:
     int y = 0;
     std::vector<ConvexShape*> shapeListsByLine;
 
-    // sorrendje: 
-    // 1. (int) leftX
-    // 2. z
+    // sorrendje: a shape-ek látható területének bal oldala szerint növekvő
     ConvexShape* activeShapes;
 
     int dmaChannel;

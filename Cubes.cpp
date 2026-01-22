@@ -8,13 +8,13 @@ const bool TRACE_UV_MATRICES = 0;
 
 Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
     //addCube(Point3DInt(2, 0, 3), GRASS);
-    for (int x = -6; x <= 4; x++) {
+    for (int x = -7; x <= 6; x++) {
         for (int z = 4; z <= 20; z++) {
             addCube(Point3DInt(x, -4, z), GRASS);
         }
     }
 
-    for (int x = 5; x <= 7; x++) {
+    for (int x = 7; x <= 7; x++) {
         for (int z = 9; z <= 11; z++) {
             addCube(Point3DInt(x, -4, z), GRASS);
         }

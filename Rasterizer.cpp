@@ -309,11 +309,10 @@ void Rasterizer::renderSpans(uint16_t* buffer) {
                 continue;
             if (sLeft >= shapeRight)
                 break;
-            if (s->group->zIndex > shape->group->zIndex &&
-                (!rightClipShape || s->group->zIndex > rightClipShape->group->zIndex &&
-                 sLeft <= rightClip)) {
+            if (s->group->zIndex > shape->group->zIndex) {
                 rightClipShape = s;
                 rightClip = sLeft;
+                break;
             }
         }
 
