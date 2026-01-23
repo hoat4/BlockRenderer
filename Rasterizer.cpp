@@ -6,7 +6,7 @@
 #include <algorithm>
 #include "textures.hpp" // méret konstansok miatt
 #include "arm_acle.h" // usat miatt
-
+#include <iomanip> // std::stringstream
 #include <pico/stdlib.h> // get_absolute_time
 
 const bool TRACE_CHANGE_ACTIVE_LIST = false;
@@ -110,7 +110,7 @@ void Rasterizer::waitForLineFinish() {
 
 void Rasterizer::addToActiveList(ConvexShape* shapeToAdd) {
     if (TRACE_CHANGE_ACTIVE_LIST || TRACE_FILLS) {
-        printf("Add %s at %f-%f (z-index: %f)\n", shapeToAdd->fill->toString().c_str(),
+        printf("Add %s at %f-%f (z-index: %f)\n", shapeToAdd->toString().c_str(),
                shapeToAdd->leftX, shapeToAdd->rightX, shapeToAdd->group->zIndex);
         printf("Before addToActiveList: ");
         printActiveShapes();
@@ -149,7 +149,7 @@ void Rasterizer::addToActiveList(ConvexShape* shapeToAdd) {
 
 void Rasterizer::removeFromActiveList(ConvexShape* shape) {
     if (TRACE_CHANGE_ACTIVE_LIST || TRACE_FILLS)
-        printf("Remove %s\n", shape->fill->toString().c_str());
+        printf("Remove %s\n", shape->toString().c_str());
     if (shape->prevInActiveList)
         shape->prevInActiveList->nextInActiveList = shape->nextInActiveList;
     else
@@ -345,7 +345,7 @@ void Rasterizer::renderSpans(uint16_t* buffer) {
 void Rasterizer::fillWithBackground(uint16_t* from, uint16_t* to) {
     uint16_t rgb565 = background;
 
-    if (to - from <= 10) {
+    if (to - from <= 15) {
         while (from != to)
             (*from++) = rgb565;
         return;
@@ -372,9 +372,9 @@ void Rasterizer::fillWithBackground(uint16_t* from, uint16_t* to) {
     );
 }
 
-void Rasterizer::fillWithPerspectiveTexture(Fill* fill,
-                                            uint16_t* from, uint16_t* to,
-                                            int x2, int y2) {
+inline void Rasterizer::fillWithPerspectiveTexture(Fill* fill,
+                                                   uint16_t* from, uint16_t* to,
+                                                   int x2, int y2) {
     PerspectiveTextureMapping& m = fill->textureMapping.perspective;
 
     float x = x2 - m.baseX;
@@ -445,9 +445,9 @@ void Rasterizer::fillWithPerspectiveTexture(Fill* fill,
 }
 
 
-void Rasterizer::fillWithInterpolatedTexture(Fill* fill,
-                                             uint16_t* from, uint16_t* to,
-                                             int x2, int y2) {
+inline void Rasterizer::fillWithInterpolatedTexture(Fill* fill,
+                                                    uint16_t* from, uint16_t* to,
+                                                    int x2, int y2) {
     InterpolatedTextureMapping& m = fill->textureMapping.interpolated;
     int x = x2 - m.baseX;
     int y = y2 - m.baseY;
@@ -534,7 +534,7 @@ void ConvexShape::modifyPoints(std::span<Point2D> leftPoints, std::span<Point2D>
 
 
     this->top = (int)std::floor(leftPoints.front().y);
-    this->bottom = (int)std::ceil(leftPoints.back().y);
+    this->bottom = (int)std::floor(leftPoints.back().y);
 
     if (top == bottom)
         // felesleges kiszámolni a pontokat, mert beginFrame úgyis ignorálni fogja ezt a shapeet
@@ -571,6 +571,14 @@ void ConvexShape::modifyPoints(std::span<Point2D> leftPoints, std::span<Point2D>
     for (; v < 2; v++) {
         this->intermediateVertices[v].y = std::numeric_limits<int>::max();
     }
+}
+
+std::string ConvexShape::toString() {
+    std::stringstream s;
+    s << debugName;
+    s << " ";
+    s << fill->toString();
+    return s.str();
 }
 
 ConvexShape::~ConvexShape() {

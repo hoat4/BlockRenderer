@@ -56,6 +56,8 @@ public: // Fill.fillSpan miatt
 
     ConvexShapeGroup* group;
 
+    std::string toString();
+
 private:
 
     // Rasterizer::shapeListsByLine-ben használva
@@ -76,7 +78,10 @@ private:
 
     IntermediateVertex intermediateVertices[2];
 
+
 public:
+
+    std::string debugName;
 
     /**
      * Mindkét listában legalább két pontnak kell lennie (felső, alsó).

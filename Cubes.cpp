@@ -3,22 +3,24 @@
 #include <stdio.h>
 #include "textures.hpp"
 #include "math.h"
+#include <iomanip>
 
 const bool TRACE_UV_MATRICES = 0;
 
 Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
     //addCube(Point3DInt(2, 0, 3), GRASS);
-    for (int x = -7; x <= 6; x++) {
+    for (int x = -8; x <= 7; x++) {
         for (int z = 4; z <= 20; z++) {
             addCube(Point3DInt(x, -4, z), GRASS);
         }
     }
 
+    /*
     for (int x = 7; x <= 7; x++) {
         for (int z = 9; z <= 11; z++) {
             addCube(Point3DInt(x, -4, z), GRASS);
         }
-    }
+    }*/
     for (int x = -5; x <= -3; x++) {
         for (int y = -3; y <= -1; y++) {
             addCube(Point3DInt(x, y, 11), OAK_PLANKS);
@@ -174,6 +176,18 @@ void Cubes::update() {
 
                 cube.cachedShapes[face] = faceShape = ConvexShape::create(
                     cube.convexShapeGroup, 4, 4, fill);
+
+                std::stringstream s;
+                s << "(" << cube.pos.x << ", " << cube.pos.y << ", " << cube.pos.z << ") ";
+                switch (face) {
+                case FACE_NORTH: s << "NORTH"; break;
+                case FACE_SOUTH: s << "SOUTH"; break;
+                case FACE_WEST: s << "WEST"; break;
+                case FACE_EAST: s << "EAST"; break;
+                case FACE_TOP: s << "TOP"; break;
+                case FACE_BOTTOM: s << "BOTTOM"; break;
+                }
+                faceShape->debugName = s.str();
             }
 
             std::array<Point2D, 4> projectedPoints = {
@@ -232,14 +246,14 @@ void Cubes::setCubeFaceVertices(Cube& cube, CubeFace face, std::array<Point2D, 4
     std::sort(std::begin(points), std::end(points), [](Point2D a, Point2D b) {
         return a.y == b.y ? a.x < b.x : a.y < b.y;});
 
-    /*
-printf("projected points: %d,%d; %d,%d; %d,%d; %d,%d\n",
-       points[0].x.floor(), points[0].y.floor(),
-       points[1].x.floor(), points[1].y.floor(),
-       points[2].x.floor(), points[2].y.floor(),
-       points[3].x.floor(), points[3].y.floor()
-);
-*/
+    if (false)
+        printf("(%d, %d, %d) projected points: %f,%f; %f,%f; %f,%f; %f,%f\n",
+               cube.pos.x, cube.pos.y, cube.pos.z,
+               points[0].x, points[0].y,
+               points[1].x, points[1].y,
+               points[2].x, points[2].y,
+               points[3].x, points[3].y
+        );
 
 
     std::array<Point2D, 4> leftPoints, rightPoints;
@@ -310,12 +324,12 @@ void Cubes::computeZUVMatrix(Cube& cube, CubeFace face, PerspectiveTextureMappin
     textureFill.zReciprocal.byX = textureFill.zReciprocal.by8X * (1.0f / pixelStepRight);
     textureFill.zReciprocal.byY = down.zReciprocal - origin.zReciprocal;
 
-    textureFill.uPerZ.base = origin.uPerZ;
+    //textureFill.uPerZ.base = origin.uPerZ;
     textureFill.uPerZ.by8X = right.uPerZ - origin.uPerZ;
     textureFill.uPerZ.byX = textureFill.uPerZ.by8X * (1.0f / pixelStepRight);
     textureFill.uPerZ.byY = down.uPerZ - origin.uPerZ;
 
-    textureFill.vPerZ.base = origin.vPerZ;
+    //textureFill.vPerZ.base = origin.vPerZ;
     textureFill.vPerZ.by8X = right.vPerZ - origin.vPerZ;
     textureFill.vPerZ.byX = textureFill.vPerZ.by8X * (1.0f / pixelStepRight);
     textureFill.vPerZ.byY = down.vPerZ - origin.vPerZ;

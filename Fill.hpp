@@ -21,6 +21,16 @@ struct LerpableData {
     }
 };
 
+struct LerpableDataZeroBase {
+    float byX;
+    float by8X;
+    float byY;
+
+    float valueAt(float x, float y) {
+        return x * byX + y * byY;
+    }
+};
+
 /**
  * Nem valódi perspektíva, mert csak 8px-enként van inverz projekció végrehajtva,
  * azok között lineáris interpoláció van (emiatt 8px-nél keskenyebb alakzatoknál nincs értelme használni).
@@ -30,8 +40,8 @@ struct PerspectiveTextureMapping {
     float baseX;
     float baseY;
     LerpableData zReciprocal;
-    LerpableData uPerZ;
-    LerpableData vPerZ;
+    LerpableDataZeroBase uPerZ;
+    LerpableDataZeroBase vPerZ;
 };
 
 struct InterpolatedTextureMapping {
