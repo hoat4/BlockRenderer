@@ -14,15 +14,12 @@ const bool TRACE_FILLS = false;
 const bool SHOW_SMALL_SPANS = false;
 
 // mintha kicsit gyorsabb lenne így megfordítva, de nem biztos
-const int INTERPOLATOR_LANE_U = 1;
-const int INTERPOLATOR_LANE_V = 0;
+const int INTERPOLATOR_LANE_U = 0;
+const int INTERPOLATOR_LANE_V = 1;
 
 const int TEXTURE_PIXEL_BITS = 1;
 const int MAX_TEXTURE_ROW_BITS = 5;
 
-
-// valamiért gyorsabb, ha egy ilyen mutable változóba rakjuk bele ezt a konstanst
-io_rw_32* INTERP0_BASE = interp0->base;
 
 Rasterizer::Rasterizer(int width, int height) : width(width), height(height) {
     shapeListsByLine.resize(height);
@@ -411,7 +408,7 @@ inline void Rasterizer::fillWithPerspectiveTexture(Fill* fill,
     zReciprocalValue += m.zReciprocal.by8X;
     float zNext = 1.0f / zReciprocalValue;
 
-    interp0->base[2] = (uintptr_t)fill->texture;
+    interp0->base[2] = (uintptr_t)fill->texture; // ez itthagyva gyorsabb, mintha kiemelnénk renderSpansba
     interp0->accum[INTERPOLATOR_LANE_U] = u * PERSPECTIVE_SCANLINE_SUBDIVISION;
     interp0->accum[INTERPOLATOR_LANE_V] = v * PERSPECTIVE_SCANLINE_SUBDIVISION;
 
@@ -424,12 +421,12 @@ inline void Rasterizer::fillWithPerspectiveTexture(Fill* fill,
         vPerZValue += m.vPerZ.by8X;
 
         float uNext = uPerZValue * zNext;
-        INTERP0_BASE[INTERPOLATOR_LANE_U] = (int) (uNext - u); // uIncrement
+        interp0->base[INTERPOLATOR_LANE_U] = (int) (uNext - u); // uIncrement
         u = uNext; // azért nem a lenti ifbe, hogy felhasználhassa az uNext regiszterét később másra
 
         float vNext = vPerZValue * zNext;
 
-        INTERP0_BASE[INTERPOLATOR_LANE_V] = (int) (vNext - v); // vIncrement
+        interp0->base[INTERPOLATOR_LANE_V] = (int) (vNext - v); // vIncrement
 
 
         //*(from++) = texture[(textureXFixedPoint >> UV_FRACTIONAL_BITS) +
@@ -477,9 +474,9 @@ inline void Rasterizer::fillWithInterpolatedTexture(Fill* fill,
 
     interp0->accum[INTERPOLATOR_LANE_U] = u1;
     interp0->accum[INTERPOLATOR_LANE_V] = v1;
-    INTERP0_BASE[INTERPOLATOR_LANE_U] = m.uByX;
-    INTERP0_BASE[INTERPOLATOR_LANE_V] = m.vByX;
-    INTERP0_BASE[2] = (uintptr_t)fill->texture;
+    interp0->base[INTERPOLATOR_LANE_U] = m.uByX;
+    interp0->base[INTERPOLATOR_LANE_V] = m.vByX;
+    interp0->base[2] = (uintptr_t)fill->texture;
 
     do {
         *(from++) = *(uint16_t*)interp0->pop[2];
