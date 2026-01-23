@@ -32,7 +32,7 @@ Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
         }
     }
 
-    addCube(Point3DInt(2, -3, 6), DIRT);
+    addCube(Point3DInt(2, -3, 6), FLOWING_WATER);
     addCube(Point3DInt(-4, -3, 6), DIRT);
     addCube(Point3DInt(-2, -3, 7), GRASS);
     addCube(Point3DInt(-3, -3, 8), DIRT);
@@ -118,6 +118,8 @@ void Cubes::update() {
 
     rasterizer->shapes.erase(rasterizer->shapes.begin(), rasterizer->shapes.end());
 
+    int waterFlowTextureNumber = (frameID >> 2) % WATER_FLOW_TEXTURES_COUNT;
+
     for (auto it = cubes.begin(); it != cubes.end(); ++it) {
         Cube& cube = **it;
         cube.updatedAtFrame = frameID;
@@ -168,6 +170,7 @@ void Cubes::update() {
                     face == FACE_TOP ? GRASS_TOP_TEXTURE :
                     face == FACE_BOTTOM ? DIRT_TEXTURE : GRASS_SIDE_TEXTURE :
                     cube.type == OAK_PLANKS ? OAK_PLANKS_TEXTURE :
+                    cube.type == FLOWING_WATER ? WATER_FLOW_TEXTURES[waterFlowTextureNumber] :
                     DIRT_TEXTURE;
 
                 Fill* fill = new Fill();
@@ -208,6 +211,10 @@ void Cubes::update() {
                 computeZUVMatrix(cube, (CubeFace)face,
                                  faceShape->fill->textureMapping.perspective,
                                  projectedPoints[0]);
+            }
+
+            if (cube.type == FLOWING_WATER) {
+                faceShape->fill->texture = WATER_FLOW_TEXTURES[waterFlowTextureNumber];
             }
         }
     }
@@ -304,11 +311,13 @@ void Cubes::computeZUVMatrix(Cube& cube, CubeFace face, PerspectiveTextureMappin
 
     int pixelStepRight = 8;
 
-    textureFill.baseX = p.x;
-    textureFill.baseY = p.y;
+    textureFill.baseX = (int)std::floor(p.x);
+    textureFill.baseY = (int)std::floor(p.y);
     ZUV origin = computeZUV(cube, face, textureFill.baseX, textureFill.baseY);
     ZUV right = computeZUV(cube, face, textureFill.baseX + pixelStepRight, textureFill.baseY);
     ZUV down = computeZUV(cube, face, textureFill.baseX, textureFill.baseY + 1);
+
+    // TODO ellenőrizni kéne hogy nem lépünk-e túl a textúraméreten a shape szélén
 
     if (face == FACE_SOUTH && false) {
         printf("\n");
@@ -350,8 +359,8 @@ void Cubes::computeZUVMatrix(Cube& cube, CubeFace face, PerspectiveTextureMappin
 }
 
 ZUV Cubes::computeZUV(Cube& cube, CubeFace face, float x, float y) {
-    float xNormalized = x * 2.0 / rasterizer->screenWidth() - 1.0;
-    float yNormalized = (1.0 - y * 2.0 / rasterizer->screenHeight()) / aspectRatio;
+    float xNormalized = x * 2.0f / rasterizer->screenWidth() - 1.0f;
+    float yNormalized = (1.0f - y * 2.0f / rasterizer->screenHeight()) / aspectRatio;
 
     float z;
     float u;

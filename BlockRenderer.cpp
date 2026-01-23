@@ -58,8 +58,10 @@ int main() {
             panic("failed to render line %d: %s\n", y, msg);
         }
 
-        if (expectedY == 0)
+        if (expectedY == 0) {
+            scene->update();
             rasterizer.beginFrame();
+        }
         try {
             rasterizer.prepareLine();
         } catch (const char* msg) {

@@ -386,20 +386,24 @@ inline void Rasterizer::fillWithPerspectiveTexture(Fill* fill,
     float vPerZValue = m.vPerZ.valueAt(x, y);
 
     float z = 1 / zReciprocalValue;
-    int u = __usat((int)(uPerZValue * z), (PERSPECTIVE_UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS));
-    int v = __usat((int)(vPerZValue * z), (PERSPECTIVE_UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS));
+    int u = (int)(uPerZValue * z);
+    int v = (int)(vPerZValue * z);
 
-    // ez az if már felesleges, mert usat miatt nem lehetséges ilyen (ami nem feltétlen jó,
-    // mert a tényleges se tudjuk így kiszűrni)
+    // usat-ot használtunk, de az lassabb volt mint ha csak a textúra paddingra hagyatkozunk: 
+    // int u = __usat((int)(uPerZValue * z), (PERSPECTIVE_UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS));
+    // reméljük hogy nem lesz nagy kerekítési vagy numerikus hiba ami miatt nagyon kicsúszna a textúrából.
+    // ha csak kicsit csúszik ki, az végülis nem baj, mert csak random színt fog beolvasni.
+
     /*
-    if (u < 0 || u >= TEXTURE_SIZE << UV_FRACTIONAL_BITS || v < 0 || v >= TEXTURE_SIZE << UV_FRACTIONAL_BITS) {
-        printf("u: %d, v: %d, original pos: (%d, %d), base: (%f, %f)\n", u, v, x2, y2, baseX, baseY);
-        printf("1/z base: %f, value: %f\n", zReciprocal.base, zReciprocalValue);
-        printf("v/z base: %f, value: %f\n", vPerZ.base, vPerZValue);
+    if (u <= -(1<<PERSPECTIVE_UV_FRACTIONAL_BITS) || u >= (TEXTURE_SIZE+1) << PERSPECTIVE_UV_FRACTIONAL_BITS ||
+        v <= -(1<<PERSPECTIVE_UV_FRACTIONAL_BITS) || v >= (TEXTURE_SIZE+1) << PERSPECTIVE_UV_FRACTIONAL_BITS) {
+        printf("u: %d, v: %d, original pos: (%d, %d), base: (%f, %f)\n", u, v, x2, y2, m.baseX, m.baseY);
+        printf("1/z base: %f, value: %f\n", m.zReciprocal.base, zReciprocalValue);
+        printf("v/z value: %f\n", m.vPerZ, vPerZValue);
         throw "texture coordinates out of bounds (1)";
     }
     */
-
+    
     zReciprocalValue += m.zReciprocal.by8X;
     float zNext = 1.0f / zReciprocalValue;
 
@@ -415,11 +419,11 @@ inline void Rasterizer::fillWithPerspectiveTexture(Fill* fill,
         uPerZValue += m.uPerZ.by8X;
         vPerZValue += m.vPerZ.by8X;
 
-        int uNext = __usat((int)(uPerZValue * zNext), PERSPECTIVE_UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS);
+        int uNext = (int)(uPerZValue * zNext);
         INTERP0_BASE[INTERPOLATOR_LANE_U] = uNext - u; // uIncrement
         u = uNext; // azért nem a lenti ifbe, hogy felhasználhassa az uNext regiszterét később másra
 
-        int vNext = __usat((int)(vPerZValue * zNext), PERSPECTIVE_UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS);
+        int vNext = (int)(vPerZValue * zNext);
 
         INTERP0_BASE[INTERPOLATOR_LANE_V] = vNext - v; // vIncrement
 

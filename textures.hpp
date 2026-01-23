@@ -12,3 +12,5 @@ extern const uint16_t* DIRT_TEXTURE;
 extern const uint16_t* GRASS_SIDE_TEXTURE;
 extern const uint16_t* GRASS_TOP_TEXTURE;
 extern const uint16_t* OAK_PLANKS_TEXTURE;
+extern const uint16_t* WATER_FLOW_TEXTURES[32];
+const uint16_t WATER_FLOW_TEXTURES_COUNT = 32;
