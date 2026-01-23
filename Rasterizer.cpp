@@ -11,6 +11,7 @@
 
 const bool TRACE_CHANGE_ACTIVE_LIST = false;
 const bool TRACE_FILLS = false;
+const bool SHOW_SMALL_SPANS = false;
 
 // mintha kicsit gyorsabb lenne így megfordítva, de nem biztos
 const int INTERPOLATOR_LANE_U = 1;
@@ -111,7 +112,7 @@ void Rasterizer::waitForLineFinish() {
 void Rasterizer::addToActiveList(ConvexShape* shapeToAdd) {
     if (TRACE_CHANGE_ACTIVE_LIST || TRACE_FILLS) {
         printf("Add %s at %f-%f (z-index: %f)\n", shapeToAdd->toString().c_str(),
-               shapeToAdd->leftX, shapeToAdd->rightX, shapeToAdd->group->zIndex);
+               shapeToAdd->leftX, shapeToAdd->rightX, shapeToAdd->zIndex);
         printf("Before addToActiveList: ");
         printActiveShapes();
     }
@@ -166,7 +167,7 @@ void Rasterizer::removeFromActiveList(ConvexShape* shape) {
  */
 bool Rasterizer::shouldBeAfterInActiveShapeList(ConvexShape* a, ConvexShape* b) {
     int aLeft = a->leftXInt, bLeft = b->leftXInt;
-    float az = a->group->zIndex, bz = b->group->zIndex;
+    float az = a->zIndex, bz = b->zIndex;
 
     if (aLeft == bLeft) {
         return az < bz;
@@ -177,12 +178,12 @@ bool Rasterizer::shouldBeAfterInActiveShapeList(ConvexShape* a, ConvexShape* b) 
         // A bal oldala balra van B-től.
         // Csak akkor kell megcserélni a két shapeet, ha A B mögött van, 
         // de kilóg tőle balra és jobbra is, de a kilógás bal részéről tudjuk, hogy nem fog látszódni.
-        return az < bz && a->group->x > b->group->x;
+        return az < bz && a->groupX > b->groupX;
     } else {
         // B bal oldala balra van A bal oldalától.
         // Akkor kell így hagyni a sorrenet, ha B A mögött van, de kilóg
         // tőle balra és jobbra is, viszont a kilógás bal részéről tudjuk, hogy nem fog látszódni.
-        return !(bz < az && b->group->x > a->group->x);
+        return !(bz < az && b->groupX > a->groupX);
     }
 }
 
@@ -243,7 +244,7 @@ void Rasterizer::checkActiveShapes() {
     ConvexShape* prevS = NULL;
     for (ConvexShape* shape = activeShapes; shape; shape = shape->nextInActiveList) {
         if (prevS && (shape->leftXInt < prevS->leftXInt || shape->prevInActiveList != prevS ||
-                      shape->leftXInt == prevS->leftXInt && shape->group->zIndex > prevS->group->zIndex)) {
+                      shape->leftXInt == prevS->leftXInt && shape->zIndex > prevS->zIndex)) {
             printActiveShapes();
             printf("leftx: %d, %d\n", shape->leftXInt, prevS->leftXInt);
             throw "wrong active shapes";
@@ -280,7 +281,7 @@ void Rasterizer::printActiveShapes() {
         printf("%s at %d-%d (group: z=%f, x=%f), ",
                shape->fill->toString().c_str(),
                shape->leftXInt, shape->rightXInt,
-               shape->group->zIndex, shape->group->x);
+               shape->zIndex, shape->groupX);
     }
     printf("\n");
 }
@@ -309,7 +310,7 @@ void Rasterizer::renderSpans(uint16_t* buffer) {
                 continue;
             if (sLeft >= shapeRight)
                 break;
-            if (s->group->zIndex > shape->group->zIndex) {
+            if (s->zIndex > shape->zIndex) {
                 rightClipShape = s;
                 rightClip = sLeft;
                 break;
@@ -328,10 +329,11 @@ void Rasterizer::renderSpans(uint16_t* buffer) {
                 printf("Fill %d-%d with %s\n", from, to, shape->fill->toString().c_str());
 
             Fill* fill = shape->fill;
+            int x2 = from - fill->baseX, y2 = y - fill->baseY;
             if (fill->isInterpolated)
-                fillWithInterpolatedTexture(fill, &buffer[from], &buffer[to], from, y);
+                fillWithInterpolatedTexture(fill, &buffer[from], &buffer[to], x2, y2);
             else
-                fillWithPerspectiveTexture(fill, &buffer[from], &buffer[to], from, y);
+                fillWithPerspectiveTexture(fill, &buffer[from], &buffer[to], x2, y2);
             prevX = to;
         }
     }
@@ -374,11 +376,14 @@ void Rasterizer::fillWithBackground(uint16_t* from, uint16_t* to) {
 
 inline void Rasterizer::fillWithPerspectiveTexture(Fill* fill,
                                                    uint16_t* from, uint16_t* to,
-                                                   int x2, int y2) {
-    PerspectiveTextureMapping& m = fill->textureMapping.perspective;
+                                                   int x, int y) {
+    if (SHOW_SMALL_SPANS && to - from < 8) {
+        while (from < to)
+            (*from++) = 0xF800;
+        return;
+    }
 
-    float x = x2 - m.baseX;
-    float y = y2 - m.baseY;
+    PerspectiveTextureMapping& m = fill->textureMapping.perspective;
 
     float zReciprocalValue = m.zReciprocal.valueAt(x, y);
 
@@ -386,8 +391,7 @@ inline void Rasterizer::fillWithPerspectiveTexture(Fill* fill,
     float vPerZValue = m.vPerZ.valueAt(x, y);
 
     float z = 1 / zReciprocalValue;
-    int u = (int)(uPerZValue * z);
-    int v = (int)(vPerZValue * z);
+    float u = uPerZValue * z, v = vPerZValue * z;
 
     // usat-ot használtunk, de az lassabb volt mint ha csak a textúra paddingra hagyatkozunk: 
     // int u = __usat((int)(uPerZValue * z), (PERSPECTIVE_UV_FRACTIONAL_BITS + TEXTURE_SIZE_BITS));
@@ -403,13 +407,13 @@ inline void Rasterizer::fillWithPerspectiveTexture(Fill* fill,
         throw "texture coordinates out of bounds (1)";
     }
     */
-    
+
     zReciprocalValue += m.zReciprocal.by8X;
     float zNext = 1.0f / zReciprocalValue;
 
     interp0->base[2] = (uintptr_t)fill->texture;
-    interp0->accum[INTERPOLATOR_LANE_U] = u << PERSPECTIVE_SCANLINE_SUBDIVISION_BITS;
-    interp0->accum[INTERPOLATOR_LANE_V] = v << PERSPECTIVE_SCANLINE_SUBDIVISION_BITS;
+    interp0->accum[INTERPOLATOR_LANE_U] = u * PERSPECTIVE_SCANLINE_SUBDIVISION;
+    interp0->accum[INTERPOLATOR_LANE_V] = v * PERSPECTIVE_SCANLINE_SUBDIVISION;
 
 
     do {
@@ -419,13 +423,13 @@ inline void Rasterizer::fillWithPerspectiveTexture(Fill* fill,
         uPerZValue += m.uPerZ.by8X;
         vPerZValue += m.vPerZ.by8X;
 
-        int uNext = (int)(uPerZValue * zNext);
-        INTERP0_BASE[INTERPOLATOR_LANE_U] = uNext - u; // uIncrement
+        float uNext = uPerZValue * zNext;
+        INTERP0_BASE[INTERPOLATOR_LANE_U] = (int) (uNext - u); // uIncrement
         u = uNext; // azért nem a lenti ifbe, hogy felhasználhassa az uNext regiszterét később másra
 
-        int vNext = (int)(vPerZValue * zNext);
+        float vNext = vPerZValue * zNext;
 
-        INTERP0_BASE[INTERPOLATOR_LANE_V] = vNext - v; // vIncrement
+        INTERP0_BASE[INTERPOLATOR_LANE_V] = (int) (vNext - v); // vIncrement
 
 
         //*(from++) = texture[(textureXFixedPoint >> UV_FRACTIONAL_BITS) +
@@ -451,10 +455,14 @@ inline void Rasterizer::fillWithPerspectiveTexture(Fill* fill,
 
 inline void Rasterizer::fillWithInterpolatedTexture(Fill* fill,
                                                     uint16_t* from, uint16_t* to,
-                                                    int x2, int y2) {
+                                                    int x, int y) {
+    if (SHOW_SMALL_SPANS && to - from < 8) {
+        while (from < to)
+            (*from++) = 0xFFF0;
+        return;
+    }
+
     InterpolatedTextureMapping& m = fill->textureMapping.interpolated;
-    int x = x2 - m.baseX;
-    int y = y2 - m.baseY;
 
     int u1 = m.uByX * x + m.uByY * y;
     int v1 = m.vByX * x + m.vByY * y;
@@ -503,15 +511,13 @@ ConvexShape* ConvexShape::create(
     float z,
     Fill* fill) {
 
-    ConvexShapeGroup* group = new ConvexShapeGroup();
-    group->zIndex = z;
-    ConvexShape* shape = create(group, leftPoints.size(), rightPoints.size(), fill);
+    ConvexShape* shape = create(leftPoints.size(), rightPoints.size(), fill);
+    shape->zIndex = z;
     shape->modifyPoints(leftPoints, rightPoints);
     return shape;
 }
 
 ConvexShape* ConvexShape::create(
-    ConvexShapeGroup* group,
     int maxLeftVertexCount, int maxRightVertexCount,
     Fill* fill) {
 
@@ -519,7 +525,6 @@ ConvexShape* ConvexShape::create(
 
     // unique_ptr.reset megpróbálná törölni a memóriaszemetet
     shape->fill = fill;
-    shape->group = group;
 
     return shape;
 }

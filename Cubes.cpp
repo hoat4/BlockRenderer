@@ -16,11 +16,17 @@ Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
     }
 
     /*
-    for (int x = 7; x <= 7; x++) {
-        for (int z = 9; z <= 11; z++) {
-            addCube(Point3DInt(x, -4, z), GRASS);
+    for (int x = 4; x <= 7; x++) {
+        for (int z = 8; z <= 11; z++) {
+            addCube(Point3DInt(x, -3, z), DIRT);
         }
-    }*/
+    }
+    for (int x = 5; x <= 7; x++) {
+        for (int z = 9; z <= 11; z++) {
+            addCube(Point3DInt(x, -2, z), DIRT);
+        }
+    }
+    */
     for (int x = -5; x <= -3; x++) {
         for (int y = -3; y <= -1; y++) {
             addCube(Point3DInt(x, y, 11), OAK_PLANKS);
@@ -33,6 +39,10 @@ Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
     }
 
     addCube(Point3DInt(2, -3, 6), FLOWING_WATER);
+    addCube(Point3DInt(3, -3, 7), DIRT);
+    addCube(Point3DInt(1, -3, 7), DIRT);
+    //addCube(Point3DInt(3, -3, 5), DIRT);
+    //addCube(Point3DInt(1, -3, 5), DIRT);
     addCube(Point3DInt(-4, -3, 6), DIRT);
     addCube(Point3DInt(-2, -3, 7), GRASS);
     addCube(Point3DInt(-3, -3, 8), DIRT);
@@ -70,7 +80,6 @@ void Cubes::addCube(Point3DInt p, CubeType type) {
         .type = type,
         .updatedAtFrame = 0,
         .cachedShapes = {NULL, NULL, NULL, NULL, NULL, NULL},
-        .convexShapeGroup = new ConvexShapeGroup(),
         .neighbours = {neighbours[0], neighbours[1], neighbours[2], neighbours[3], neighbours[4], neighbours[5] }
     };
     cubes.push_back(c);
@@ -126,9 +135,9 @@ void Cubes::update() {
 
         Point3D cubeCenter = cube.pos + Point3D(0.5, 0.5, 0.5);
         Point2D projectedCubeCenter = projectPoint(cubeCenter);
-        cube.convexShapeGroup->zIndex = -Point3D::distanceSq(cubeCenter, cameraPos);
-        cube.convexShapeGroup->x = projectedCubeCenter.x;
-        cube.convexShapeGroup->y = projectedCubeCenter.x;
+        float zIndex = -Point3D::distanceSq(cubeCenter, cameraPos);
+        float cubeCenterProjectedX = projectedCubeCenter.x;
+
         for (int face = 0; face < 6; face++) {
             bool faceVisible;
             if (cube.neighbours[face])
@@ -177,8 +186,7 @@ void Cubes::update() {
                 fill->isInterpolated = interpolatedTexture;
                 fill->texture = texture;
 
-                cube.cachedShapes[face] = faceShape = ConvexShape::create(
-                    cube.convexShapeGroup, 4, 4, fill);
+                cube.cachedShapes[face] = faceShape = ConvexShape::create(4, 4, fill);
 
                 std::stringstream s;
                 s << "(" << cube.pos.x << ", " << cube.pos.y << ", " << cube.pos.z << ") ";
@@ -193,6 +201,9 @@ void Cubes::update() {
                 faceShape->debugName = s.str();
             }
 
+            faceShape->zIndex = zIndex;
+            faceShape->groupX = cubeCenterProjectedX;
+
             std::array<Point2D, 4> projectedPoints = {
                 projectPoint((cube.pos + CUBE_VERTEX_OFFSETS[face * 4]).toFloat()),
                 projectPoint((cube.pos + CUBE_VERTEX_OFFSETS[face * 4 + 1]).toFloat()),
@@ -205,10 +216,12 @@ void Cubes::update() {
 
             if (interpolatedTexture) {
                 computeUVMatrix(cube, (CubeFace)face,
+                                faceShape->fill,
                                 faceShape->fill->textureMapping.interpolated,
                                 projectedPoints);
             } else {
                 computeZUVMatrix(cube, (CubeFace)face,
+                                 faceShape->fill,
                                  faceShape->fill->textureMapping.perspective,
                                  projectedPoints[0]);
             }
@@ -302,7 +315,7 @@ Point2D Cubes::projectPoint(Point3D p) {
     };
 }
 
-void Cubes::computeZUVMatrix(Cube& cube, CubeFace face, PerspectiveTextureMapping& textureFill, Point2D p) {
+void Cubes::computeZUVMatrix(Cube& cube, CubeFace face, Fill* fill, PerspectiveTextureMapping& textureFill, Point2D p) {
     // "1/z, u/z and v/z are linear in screen space": 
     // https://www.lysator.liu.se/~mikaelk/doc/perspectivetexture/
 
@@ -311,11 +324,13 @@ void Cubes::computeZUVMatrix(Cube& cube, CubeFace face, PerspectiveTextureMappin
 
     int pixelStepRight = 8;
 
-    textureFill.baseX = (int)std::floor(p.x);
-    textureFill.baseY = (int)std::floor(p.y);
-    ZUV origin = computeZUV(cube, face, textureFill.baseX, textureFill.baseY);
-    ZUV right = computeZUV(cube, face, textureFill.baseX + pixelStepRight, textureFill.baseY);
-    ZUV down = computeZUV(cube, face, textureFill.baseX, textureFill.baseY + 1);
+    float baseX = std::floor(p.x);
+    float baseY = std::floor(p.y);
+    fill->baseX = (int)baseX;
+    fill->baseY = (int)baseY;
+    ZUV origin = computeZUV(cube, face, baseX, baseY);
+    ZUV right = computeZUV(cube, face, baseX + pixelStepRight, baseY);
+    ZUV down = computeZUV(cube, face, baseX, baseY + 1);
 
     // TODO ellenőrizni kéne hogy nem lépünk-e túl a textúraméreten a shape szélén
 
@@ -415,25 +430,28 @@ ZUV Cubes::computeZUV(Cube& cube, CubeFace face, float x, float y) {
 
 
 void Cubes::computeUVMatrix(Cube& cube, CubeFace face,
+                            Fill* fill,
                             InterpolatedTextureMapping& textureFill,
                             std::array<Point2D, 4> points) {
 
-    textureFill.baseX = std::floor(points[0].x);
-    textureFill.baseY = std::floor(points[0].y);
+    float baseX = std::floor(points[0].x);
+    float baseY = std::floor(points[0].y);
+    fill->baseX = (int)baseX;
+    fill->baseY = (int)baseY;
 
     Point2D pointAtTextureRightTop = {
-        .x = std::floor(points[1].x) - textureFill.baseX,
-        .y = std::floor(points[1].y) - textureFill.baseY
+        .x = std::floor(points[1].x) - baseX,
+        .y = std::floor(points[1].y) - baseY
     };
 
     Point2D pointAtTextureLeftBottom = {
-        .x = std::floor(points[2].x) - textureFill.baseX,
-        .y = std::floor(points[2].y) - textureFill.baseY
+        .x = std::floor(points[2].x) - baseX,
+        .y = std::floor(points[2].y) - baseY
     };
 
     Point2D pointAtTextureRightBottom = {
-        .x = std::floor(points[3].x) - textureFill.baseX,
-        .y = std::floor(points[3].y) - textureFill.baseY
+        .x = std::floor(points[3].x) - baseX,
+        .y = std::floor(points[3].y) - baseY
     };
 
     float m00 = pointAtTextureRightTop.x / 16.0f;

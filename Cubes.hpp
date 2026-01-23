@@ -82,9 +82,9 @@ private:
 
     void setCubeFaceVertices(Cube& cube, CubeFace face, std::array<Point2D, 4> points);
     ZUV computeZUV(Cube& cube, CubeFace face, float x, float y);
-    void computeZUVMatrix(Cube& cube, CubeFace face, PerspectiveTextureMapping& textureFill,
+    void computeZUVMatrix(Cube& cube, CubeFace face, Fill* fill, PerspectiveTextureMapping& textureFill,
                           Point2D origin);
-    void computeUVMatrix(Cube& cube, CubeFace face, InterpolatedTextureMapping& textureFill,
+    void computeUVMatrix(Cube& cube, CubeFace face, Fill* fill, InterpolatedTextureMapping& textureFill,
                          std::array<Point2D, 4> points);
     Point2D projectPoint(Point3D p);
 };
@@ -96,8 +96,6 @@ struct Cube {
 
     uint64_t updatedAtFrame;
     ConvexShape* cachedShapes[6];
-
-    ConvexShapeGroup* convexShapeGroup;
 
     Cube* neighbours[6];
 };

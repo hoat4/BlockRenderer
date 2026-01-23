@@ -26,15 +26,6 @@ struct IntermediateVertex {
     float slope;
 };
 
-class ConvexShape;
-
-struct ConvexShapeGroup {
-
-    float zIndex;
-    float x;
-    float y; // ez valójában nincs is használva
-};
-
 class ConvexShape {
 
     friend class Rasterizer;
@@ -51,10 +42,12 @@ class ConvexShape {
     float topLeftSlope;
     float topRightSlope;
 
-public: // Fill.fillSpan miatt
+
+public:
     Fill* fill; // törölve lesz ~ConvexShape-ben
 
-    ConvexShapeGroup* group;
+    float zIndex;
+    float groupX;
 
     std::string toString();
 
@@ -94,7 +87,7 @@ public:
     /**
      * Ezután a modifyPointsot meg kell hívni.
      */
-    static ConvexShape* create(ConvexShapeGroup* group, int maxLeftPoints, int maxRightPoints,
+    static ConvexShape* create(int maxLeftPoints, int maxRightPoints,
                                Fill* fill);
 
     void modifyPoints(std::span<Point2D> leftPoints, std::span<Point2D> rightPoints);
@@ -162,8 +155,8 @@ private:
     void fillSpan(uint16_t* buffer, float from, float to);
     void fillWithBackground(uint16_t* from, uint16_t* to);
     static void fillWithPerspectiveTexture(Fill* texture,
-                                    uint16_t* from, uint16_t* to, int x2, int y2);
+                                           uint16_t* from, uint16_t* to, int x2, int y2);
     static void fillWithInterpolatedTexture(Fill* texture,
-                                     uint16_t* from, uint16_t* to, int x2, int y2);
+                                            uint16_t* from, uint16_t* to, int x2, int y2);
 
 };

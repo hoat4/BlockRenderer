@@ -37,8 +37,6 @@ struct LerpableDataZeroBase {
  */
 struct PerspectiveTextureMapping {
 
-    float baseX;
-    float baseY;
     LerpableData zReciprocal;
     LerpableDataZeroBase uPerZ;
     LerpableDataZeroBase vPerZ;
@@ -46,8 +44,6 @@ struct PerspectiveTextureMapping {
 
 struct InterpolatedTextureMapping {
 
-    int baseX;
-    int baseY;
     int uByX;
     int uByY;
     int vByX;
@@ -69,6 +65,8 @@ struct Fill {
     const uint16_t* texture;
 
     bool isInterpolated;
+    int baseX;
+    int baseY;
     TextureMapping textureMapping;
 
     std::string toString();
