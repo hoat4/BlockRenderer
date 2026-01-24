@@ -69,6 +69,9 @@ private:
 
     int minXFloor;
 
+    int* cachedRightClipPtr;
+    ConvexShape* cachedRightClipShape;
+
     IntermediateVertex intermediateVertices[2];
 
 
@@ -117,6 +120,8 @@ private:
     interp_config interpolatorLaneUConfig;
     interp_config interpolatorLaneVConfig;
 
+    bool renderOrderInvalidated;
+
 public:
     std::vector<ConvexShape*> shapes;
     uint16_t background;
@@ -131,8 +136,12 @@ public:
     void renderLine(uint16_t* buffer);
     void waitForLineFinish();
 
-    int screenWidth();
-    int screenHeight();
+    inline int screenWidth() {
+        return width;
+    }
+    inline int screenHeight() {
+        return height;
+    }
 
     static const int PERSPECTIVE_UV_FRACTIONAL_BITS = 12;
     static const int PERSPECTIVE_SCANLINE_SUBDIVISION_BITS = 3;

@@ -46,14 +46,6 @@ Rasterizer::Rasterizer(int width, int height) : width(width), height(height) {
     interpolatorLaneVConfig = cfg;
 }
 
-int Rasterizer::screenWidth() {
-    return width;
-}
-
-int Rasterizer::screenHeight() {
-    return height;
-}
-
 void Rasterizer::beginFrame() {
     std::fill(shapeListsByLine.begin(), shapeListsByLine.end(), (ConvexShape*)NULL);
 
@@ -72,6 +64,8 @@ void Rasterizer::beginFrame() {
     activeShapes = NULL;
 
     y = 0;
+
+    renderOrderInvalidated = true;
 }
 
 void Rasterizer::skipLines(int lines) {
@@ -143,6 +137,8 @@ void Rasterizer::addToActiveList(ConvexShape* shapeToAdd) {
         printActiveShapes();
         printf("\n");
     }
+
+    renderOrderInvalidated = true;
 }
 
 void Rasterizer::removeFromActiveList(ConvexShape* shape) {
@@ -156,13 +152,15 @@ void Rasterizer::removeFromActiveList(ConvexShape* shape) {
         shape->nextInActiveList->prevInActiveList = shape->prevInActiveList;
     shape->prevInActiveList = NULL;
     shape->nextInActiveList = NULL;
+
+    renderOrderInvalidated = true;
 }
 
 /**
  * ha megfordul a és b, akkor az ellentétjét adja vissza (kivéve ha nem lehet
  * eldönteni hogy melyik van balra és jobbra)
  */
-bool Rasterizer::shouldBeAfterInActiveShapeList(ConvexShape* a, ConvexShape* b) {
+inline bool Rasterizer::shouldBeAfterInActiveShapeList(ConvexShape* a, ConvexShape* b) {
     int aLeft = a->leftXInt, bLeft = b->leftXInt;
     float az = a->zIndex, bz = b->zIndex;
 
@@ -184,8 +182,11 @@ bool Rasterizer::shouldBeAfterInActiveShapeList(ConvexShape* a, ConvexShape* b) 
     }
 }
 
-void Rasterizer::shiftLeftInActiveList(ConvexShape* shape) {
+inline void Rasterizer::shiftLeftInActiveList(ConvexShape* shape) {
+    bool wasShifted = false;
     while (shape->prevInActiveList && !shouldBeAfterInActiveShapeList(shape, shape->prevInActiveList)) {
+        wasShifted = true;
+
         ConvexShape* prev = shape->prevInActiveList;
         if (shape->nextInActiveList)
             shape->nextInActiveList->prevInActiveList = prev;
@@ -198,6 +199,8 @@ void Rasterizer::shiftLeftInActiveList(ConvexShape* shape) {
         shape->nextInActiveList = prev;
         prev->prevInActiveList = shape;
     }
+    if (wasShifted)
+        renderOrderInvalidated = true;
 }
 
 void __not_in_flash_func(Rasterizer::processCurrentLine)() {
@@ -301,17 +304,24 @@ void Rasterizer::renderSpans(uint16_t* buffer) {
 
         int rightClip = shapeRight;
         ConvexShape* rightClipShape = NULL;
-        for (ConvexShape* s = shape->nextInActiveList; s; s = s->nextInActiveList) {
-            int sLeft = s->leftXInt;
-            if (sLeft == shapeLeft)
-                continue;
-            if (sLeft >= shapeRight)
-                break;
-            if (s->zIndex > shape->zIndex) {
-                rightClipShape = s;
-                rightClip = sLeft;
-                break;
+        if (renderOrderInvalidated) {
+            for (ConvexShape* s = shape->nextInActiveList; s; s = s->nextInActiveList) {
+                int sLeft = s->leftXInt;
+                if (sLeft == shapeLeft)
+                    continue;
+                if (sLeft >= shapeRight)
+                    break;
+                if (s->zIndex > shape->zIndex) {
+                    rightClipShape = s;
+                    rightClip = sLeft;
+                    break;
+                }
             }
+            shape->cachedRightClipPtr = rightClipShape ? &rightClipShape->leftXInt : &shape->rightXInt;
+            shape->cachedRightClipShape = rightClipShape;
+        } else {
+            rightClip = *shape->cachedRightClipPtr;
+            rightClipShape = shape->cachedRightClipShape;
         }
 
         int from = std::max(shapeLeft, prevX);
@@ -339,6 +349,7 @@ void Rasterizer::renderSpans(uint16_t* buffer) {
             printf("Fill background %d-%d\n", prevX, width);
         fillWithBackground(&buffer[prevX], &buffer[width]);
     }
+    renderOrderInvalidated = false;
 }
 
 void Rasterizer::fillWithBackground(uint16_t* from, uint16_t* to) {
@@ -421,12 +432,12 @@ inline void Rasterizer::fillWithPerspectiveTexture(Fill* fill,
         vPerZValue += m.vPerZ.by8X;
 
         float uNext = uPerZValue * zNext;
-        interp0->base[INTERPOLATOR_LANE_U] = (int) (uNext - u); // uIncrement
+        interp0->base[INTERPOLATOR_LANE_U] = (int)(uNext - u); // uIncrement
         u = uNext; // azért nem a lenti ifbe, hogy felhasználhassa az uNext regiszterét később másra
 
         float vNext = vPerZValue * zNext;
 
-        interp0->base[INTERPOLATOR_LANE_V] = (int) (vNext - v); // vIncrement
+        interp0->base[INTERPOLATOR_LANE_V] = (int)(vNext - v); // vIncrement
 
 
         //*(from++) = texture[(textureXFixedPoint >> UV_FRACTIONAL_BITS) +

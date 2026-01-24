@@ -41,7 +41,7 @@ Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
     addCube(Point3DInt(2, -3, 6), FLOWING_WATER);
     addCube(Point3DInt(3, -3, 7), DIRT);
     addCube(Point3DInt(1, -3, 7), DIRT);
-    //addCube(Point3DInt(3, -3, 5), DIRT);
+    addCube(Point3DInt(3, -3, 5), DIRT);
     addCube(Point3DInt(1, -3, 5), DIRT);
     addCube(Point3DInt(-4, -3, 6), DIRT);
     addCube(Point3DInt(-2, -3, 7), GRASS);
