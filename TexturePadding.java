@@ -36,6 +36,10 @@ void main(String[] args) throws Throwable {
     processFile("grass_side.png", "GRASS_SIDE_TEXTURE", 1);
     processFile("grass_top.png", "GRASS_TOP_TEXTURE", 1);
     processFile("planks_oak.png", "OAK_PLANKS_TEXTURE", 1);
+    processFile("log_oak_top.png", "OAK_LOG_TOP_TEXTURE", 1);
+    processFile("log_oak.png", "OAK_LOG_SIDE_TEXTURE", 1);
+    processFile("oak_leaves_opaque.png", "OAK_LEAVES_TEXTURE", 1);
+    
     processFile("water_flow.png", "WATER_FLOW_TEXTURES", 32);
 
     Files.writeString(Path.of("textures.cpp"), out.toString());
@@ -117,9 +121,15 @@ record RGB(int r, int g, int b) {
 }
 
 RGB at(int x, int y) {
-    int rgba = img.getRGB(x * scale, y * scale);
-    int r = rgba >>> 16 & 0xFF;
-    int g = rgba >>> 8 & 0xFF;
-    int b = rgba & 0xFF;
-    return new RGB(r, g, b);
+    int rSum = 0, gSum = 0, bSum = 0;
+    for (int x2 = 0; x2 < scale; x2++) {
+        for (int y2 = 0; y2 < scale; y2++) {
+            int rgba = img.getRGB(x * scale + x2, y * scale + y2);
+            rSum += rgba >>> 16 & 0xFF;
+            gSum += rgba >>> 8 & 0xFF;
+            bSum += rgba & 0xFF;
+        }
+    }
+    int n = scale * scale;
+    return new RGB(rSum / n, gSum / n, bSum / n);
 }

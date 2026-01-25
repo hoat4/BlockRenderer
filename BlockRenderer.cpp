@@ -17,12 +17,27 @@ int main() {
     DVIDisplay display(pinout);
 
     Rasterizer rasterizer(display.width(), display.height());
-    Scene* scene = new Cubes();
+    Scene* scene;
+    try {
+        scene = new Cubes();
+    } catch (char const* s) {
+        panic(s);
+    }
     scene->rasterizer = &rasterizer;
 
     int expectedY = 0;
-    scene->update();
-    rasterizer.beginFrame();
+    try {
+        scene->update();
+    } catch (char const* s) {
+        printf("can't update scene\n");
+        panic(s);
+    }
+    try {
+        rasterizer.beginFrame();
+    } catch (char const* s) {
+        printf("can't begin frame\n");
+        panic(s);
+    }
     rasterizer.prepareLine();
 
     while (true) {

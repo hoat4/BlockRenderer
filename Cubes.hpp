@@ -55,7 +55,7 @@ enum CubeFace {
 };
 
 enum CubeType {
-    DIRT, GRASS, OAK_PLANKS, FLOWING_WATER
+    DIRT, GRASS, OAK_PLANKS, FLOWING_WATER, OAK_LOG, OAK_LEAVES
 };
 
 struct ZUV {
@@ -79,6 +79,7 @@ public:
 private:
     Cube* findByPos(Point3DInt pos);
     void addCube(Point3DInt pos, CubeType type);
+    void generateTree(Point3DInt pos);
 
     void setCubeFaceVertices(Cube& cube, CubeFace face, std::array<Point2D, 4> points);
     ZUV computeZUV(Cube& cube, CubeFace face, float x, float y);

@@ -41,13 +41,72 @@ Cubes::Cubes() : cameraPos(Point3D(0.0f, 0.0f, 0.0f)) {
     addCube(Point3DInt(2, -3, 6), FLOWING_WATER);
     addCube(Point3DInt(3, -3, 7), DIRT);
     addCube(Point3DInt(1, -3, 7), DIRT);
+    addCube(Point3DInt(2, -3, 7), DIRT);
     addCube(Point3DInt(3, -3, 5), DIRT);
     addCube(Point3DInt(1, -3, 5), DIRT);
     addCube(Point3DInt(-4, -3, 6), DIRT);
     addCube(Point3DInt(-2, -3, 7), GRASS);
     addCube(Point3DInt(-3, -3, 8), DIRT);
 
+    for (int x = 1; x <= 4; x++)
+        for (int z = 9; z <= 14; z++)
+            addCube(Point3DInt(x, -3, z), GRASS);
+    addCube(Point3DInt(1, -3, 8), GRASS);
+    addCube(Point3DInt(2, -3, 8), GRASS);
+    addCube(Point3DInt(3, -3, 8), GRASS);
+
+    addCube(Point3DInt(3, -2, 13), GRASS);
+    addCube(Point3DInt(3, -2, 14), GRASS);
+    addCube(Point3DInt(4, -2, 13), GRASS);
+    addCube(Point3DInt(4, -2, 14), GRASS);
+    addCube(Point3DInt(2, -2, 14), GRASS);
+    addCube(Point3DInt(2, -2, 13), GRASS);
+    generateTree(Point3DInt(3, -1, 13));
+
     frameID = 0;
+}
+
+void Cubes::generateTree(Point3DInt p) {
+    addCube(p + Point3DInt(0, 0, 0), OAK_LOG);
+    addCube(p + Point3DInt(0, 1, 0), OAK_LOG);
+    addCube(p + Point3DInt(0, 2, 0), OAK_LOG);
+
+    for (int y = 2; y <= 3; y++) {
+        addCube(p + Point3DInt(-1, y, -1), OAK_LEAVES);
+        addCube(p + Point3DInt(0, y, -1), OAK_LEAVES);
+        addCube(p + Point3DInt(1, y, -1), OAK_LEAVES);
+        addCube(p + Point3DInt(-1, y, 0), OAK_LEAVES);
+        addCube(p + Point3DInt(1, y, 0), OAK_LEAVES);
+        addCube(p + Point3DInt(-1, y, 1), OAK_LEAVES);
+        addCube(p + Point3DInt(0, y, 1), OAK_LEAVES);
+        addCube(p + Point3DInt(1, y, 1), OAK_LEAVES);
+
+        addCube(p + Point3DInt(-1, y, -2), OAK_LEAVES);
+        addCube(p + Point3DInt(0, y, -2), OAK_LEAVES);
+        addCube(p + Point3DInt(1, y, -2), OAK_LEAVES);
+
+        addCube(p + Point3DInt(-2, y, -1), OAK_LEAVES);
+        addCube(p + Point3DInt(2, y, -1), OAK_LEAVES);
+
+        addCube(p + Point3DInt(-2, y, 0), OAK_LEAVES);
+        addCube(p + Point3DInt(2, y, 0), OAK_LEAVES);
+
+        addCube(p + Point3DInt(-2, y, 1), OAK_LEAVES);
+        addCube(p + Point3DInt(2, y, 1), OAK_LEAVES);
+
+        addCube(p + Point3DInt(-1, y, 2), OAK_LEAVES);
+        addCube(p + Point3DInt(0, y, 2), OAK_LEAVES);
+        addCube(p + Point3DInt(1, y, 2), OAK_LEAVES);
+    }
+    for (int y = 4; y <= 5; y++) {
+        addCube(p + Point3DInt(0, y, -1), OAK_LEAVES);
+
+        addCube(p + Point3DInt(-1, y, 0), OAK_LEAVES);
+        addCube(p + Point3DInt(0, y, 0), OAK_LEAVES);
+        addCube(p + Point3DInt(1, y, 0), OAK_LEAVES);
+
+        addCube(p + Point3DInt(0, y, 1), OAK_LEAVES);
+    }
 }
 
 Cube* Cubes::findByPos(Point3DInt p) {
@@ -68,8 +127,10 @@ Point3DInt CUBE_NEIGHBOUR_OFFSETS[] = {
 };
 
 void Cubes::addCube(Point3DInt p, CubeType type) {
-    if (findByPos(p))
+    if (findByPos(p)) {
+        printf("(%d, %d, %d)\n", p.x, p.y, p.z);
         throw "already exists";
+    }
 
     Cube* neighbours[6] = { NULL, NULL, NULL, NULL, NULL, NULL };
     for (int face = 0; face < 6; face++)
@@ -127,7 +188,7 @@ void Cubes::update() {
 
     rasterizer->shapes.erase(rasterizer->shapes.begin(), rasterizer->shapes.end());
 
-    int waterFlowTextureNumber = (frameID >> 2) % WATER_FLOW_TEXTURES_COUNT;
+    int waterFlowTextureNumber = (frameID / 3) % WATER_FLOW_TEXTURES_COUNT;
 
     for (auto it = cubes.begin(); it != cubes.end(); ++it) {
         Cube& cube = **it;
@@ -180,6 +241,10 @@ void Cubes::update() {
                     face == FACE_BOTTOM ? DIRT_TEXTURE : GRASS_SIDE_TEXTURE :
                     cube.type == OAK_PLANKS ? OAK_PLANKS_TEXTURE :
                     cube.type == FLOWING_WATER ? WATER_FLOW_TEXTURES[waterFlowTextureNumber] :
+                    cube.type == OAK_LOG ?
+                    face == FACE_TOP || face == FACE_BOTTOM ?
+                    OAK_LOG_TOP_TEXTURE : OAK_LOG_SIDE_TEXTURE :
+                    cube.type == OAK_LEAVES ? OAK_LEAVES_TEXTURE :
                     DIRT_TEXTURE;
 
                 Fill* fill = new Fill();
